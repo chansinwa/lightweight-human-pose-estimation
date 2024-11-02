@@ -83,6 +83,7 @@ def infer_fast(net, img, net_input_height_size, stride, upsample_ratio, cpu,
 
     return heatmaps, pafs, scale, pad
 
+# Function to write the info on the img, Tommy, 02-11-2024
 def console_log(img, msg):
     font = cv2.FONT_HERSHEY_SIMPLEX
     fontScale = 0.5
@@ -118,7 +119,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
     previous_poses = []
     delay = 1
     
-    # code for saving files
+    # code for saving files, Tommy, 02-11-2024
     frame_num = 0
     current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
     try:
@@ -177,12 +178,12 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
                 cv2.putText(img, 'id: {}'.format(pose.id), (pose.bbox[0], pose.bbox[1] - 16),
                             cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255))
                 
-                # Write the info on the img
+                # Write the info on the img, Tommy, 02-11-2024
                 console_log(img, {
                     'filename': filename,
                     'frame_num': frame_num
                 })
-                # Save the image
+                # Save the image, Tommy, 02-11-2024
                 image_name = "frame_" + str(frame_num) + ".jpg"
                 cv2.imwrite(export_path + image_name, img)
                 
