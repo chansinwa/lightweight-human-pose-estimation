@@ -34,7 +34,7 @@ class ImageReader(object):
         self.idx = self.idx + 1
         return img
 
-
+ 
 class VideoReader(object):
     def __init__(self, file_name):
         self.file_name = file_name
