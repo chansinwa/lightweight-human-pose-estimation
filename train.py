@@ -18,7 +18,7 @@ from val import evaluate
 
 cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)  # To prevent freeze of DataLoader
-
+ 
 # Device configuration
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu") #change here
 
