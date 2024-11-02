@@ -3,6 +3,9 @@ import argparse
 import cv2
 import numpy as np
 import torch
+import os
+import datetime
+import shutil
 
 from models.with_mobilenet import PoseEstimationWithMobileNet
 from modules.keypoints import extract_keypoints, group_keypoints
@@ -80,6 +83,28 @@ def infer_fast(net, img, net_input_height_size, stride, upsample_ratio, cpu,
 
     return heatmaps, pafs, scale, pad
 
+def console_log(img, msg):
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    fontScale = 0.5
+    org = (10, 30)  # Coordinates for the top-left corner
+    fontColor = (0, 255, 0)
+    backgroundColor = (0, 0, 255)  # Red background color
+    padding = 5
+    lineType = 2 # Thickness of the line
+    
+    lines = [
+        "inputed file: " + str(msg['filename']),
+        "frame: " + str(msg['frame_num'])
+    ]
+    
+    y = org[1]
+    for line in lines:
+        # (text_width, text_height), _ = cv2.getTextSize(line, font, fontScale, lineType)
+        # cv2.rectangle(img, (org[0], y - text_height + padding), (org[0] + text_width + 2 * padding, y + padding), backgroundColor, -1) # Draw text background
+        cv2.putText(img, line, (org[0], y), font, fontScale, fontColor, lineType)
+        y += 20  # Adjust this value to control the spacing between lines
+    
+    return img
 
 def run_demo(net, image_provider, height_size, cpu, track, smooth):
     net = net.eval()
@@ -92,6 +117,25 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
     num_keypoints = Pose.num_kpts
     previous_poses = []
     delay = 1
+    
+    # code for saving files
+    frame_num = 0
+    current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+    try:
+        filename = os.path.basename(image_provider.file_name)
+    except:
+        filename = "webcam"
+    export_path = f"detection/exports/{filename}_{current_datetime}/"
+    
+    if not os.path.exists(f"{export_path}"):
+        os.makedirs(f"{export_path}")
+    else:
+        shutil.rmtree(f"{export_path}/")
+        os.makedirs(f"{export_path}/")
+    
+    print("imported file:", filename)
+    # code for saving files
+    
     for img in image_provider:
         orig_img = img.copy()
         heatmaps, pafs, scale, pad = infer_fast(net, img, height_size, stride, upsample_ratio, cpu)
@@ -122,13 +166,27 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
             previous_poses = current_poses
         for pose in current_poses:
             pose.draw(img)
+            
+            
         img = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
+        
         for pose in current_poses:
             cv2.rectangle(img, (pose.bbox[0], pose.bbox[1]),
                           (pose.bbox[0] + pose.bbox[2], pose.bbox[1] + pose.bbox[3]), (0, 255, 0))
             if track:
                 cv2.putText(img, 'id: {}'.format(pose.id), (pose.bbox[0], pose.bbox[1] - 16),
                             cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255))
+                
+                # Write the info on the img
+                console_log(img, {
+                    'filename': filename,
+                    'frame_num': frame_num
+                })
+                # Save the image
+                image_name = "frame_" + str(frame_num) + ".jpg"
+                cv2.imwrite(export_path + image_name, img)
+                
+                
         cv2.imshow('Lightweight Human Pose Estimation Python Demo', img)
         key = cv2.waitKey(delay)
         if key == 27:  # esc
@@ -138,6 +196,9 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
                 delay = 0
             else:
                 delay = 1
+        
+        
+        frame_num += 1
 
 
 if __name__ == '__main__':
