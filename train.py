@@ -54,7 +54,7 @@ def train(prepared_train_labels, train_images_folder, num_refinement_stages, bas
         {'params': get_parameters_conv(net.refinement_stages, 'bias'), 'lr': base_lr * 8, 'weight_decay': 0},
         {'params': get_parameters_bn(net.refinement_stages, 'weight'), 'weight_decay': 0},
         {'params': get_parameters_bn(net.refinement_stages, 'bias'), 'lr': base_lr * 2, 'weight_decay': 0},
-    ], lr=base_lr, weight_decay=5e-4)
+    ], lr=base_lr, weight_decay=5e-4) 
 
     num_iter = 0
     current_epoch = 0
