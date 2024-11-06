@@ -3081,7 +3081,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
 
                 # print("pose.keypoints:", pose.keypoints)
                 # Create a new array of objects with the desired format, for printing the keypoints data
-
+                # To Sita: making the keypoint_list
                 for i, keypoint in enumerate(pose.keypoints):
                     kpt_id = i
                     kpt_name = Pose.kpt_names[i]
@@ -3115,13 +3115,15 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
                 console_log(img, {"filename": filename, "frame_num": frame_num})
                 # Save the image, Tommy, 02-11-2024
                 image_name = "frame_" + str(frame_num) + ".jpg"
+                
+                # To Sita: this two lines are for saving images
                 cv2.imwrite(export_path + image_name, img)
                 cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
 
         # cv2.imshow("Lightweight Human Pose Estimation Python Demo", img)
         # cv2.imshow("Skeleton", skeleton_img)
 
-        # # Show the tracked image and skeleton image side by side
+        # # To Sita: Show the tracked image and skeleton image side by side
         img_with_alpha = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
         combined_img = np.hstack((img_with_alpha, skeleton_img))
         cv2.imshow("Original and Skeleton", combined_img)
@@ -3146,6 +3148,8 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
 
     # print the whole keypoints_info list
     # print("kpts_list:", keypoints_info)
+    
+    # To Sita: this is for saving the text file of the checkpoint list
     with open(f"{export_path}_kpts.txt", "w") as file:
         file.write(str(keypoints_info))
 
