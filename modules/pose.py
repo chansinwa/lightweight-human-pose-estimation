@@ -28,7 +28,6 @@ class Pose:
         'b': [0, 255, 0], #Green
     }
     
-    kpts_list = []
 
     def __init__(self, keypoints, confidence):
         super().__init__()

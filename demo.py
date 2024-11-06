@@ -166,11 +166,11 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
         filename = "webcam"
     export_path = f"detection/exports/{filename}_{current_datetime}/"
 
-    if not os.path.exists(f"{export_path}"):
-        os.makedirs(f"{export_path}")
-    else:
-        shutil.rmtree(f"{export_path}/")
-        os.makedirs(f"{export_path}/")
+    # if not os.path.exists(f"{export_path}"):
+    #     os.makedirs(f"{export_path}")
+    # else:
+    #     shutil.rmtree(f"{export_path}/")
+    #     os.makedirs(f"{export_path}/")
 
     print("imported file:", filename)
     # code for saving files
