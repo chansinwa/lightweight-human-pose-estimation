@@ -12,11 +12,23 @@ class Pose:
                  'r_hip', 'r_knee', 'r_ank', 'l_hip', 'l_knee', 'l_ank',
                  'r_eye', 'l_eye',
                  'r_ear', 'l_ear']
+    
+    '''
+    The sigmas variable in the Pose class is an array that defines the standard deviations for Gaussian distributions used to model the uncertainty of the keypoints' positions. Each value corresponds to a specific body part's keypoint, indicating how much variation or noise can be expected around the detected position of that keypoint.
+    '''
     sigmas = np.array([.26, .79, .79, .72, .62, .79, .72, .62, 1.07, .87, .89, 1.07, .87, .89, .25, .25, .35, .35],
                       dtype=np.float32) / 10.0
     vars = (sigmas * 2) ** 2
     last_id = -1
     color = [0, 224, 255]
+    
+    # Customer colors BGR
+    kpts_colors = {
+        'a': [255, 0, 0], # Blue
+        'b': [0, 255, 0], #Green
+    }
+    
+    kpts_list = []
 
     def __init__(self, keypoints, confidence):
         super().__init__()
@@ -34,8 +46,10 @@ class Pose:
             if keypoints[kpt_id, 0] == -1:
                 continue
             found_keypoints[found_kpt_id] = keypoints[kpt_id]
+            # print("kpt_id:",kpt_id, keypoints[kpt_id])
             found_kpt_id += 1
         bbox = cv2.boundingRect(found_keypoints)
+        # print("found_keypoints: ", bbox)
         return bbox
 
     def update_id(self, id=None):
@@ -52,14 +66,41 @@ class Pose:
             global_kpt_a_id = self.keypoints[kpt_a_id, 0]
             if global_kpt_a_id != -1:
                 x_a, y_a = self.keypoints[kpt_a_id]
-                cv2.circle(img, (int(x_a), int(y_a)), 3, Pose.color, -1)
+                cv2.circle(img, (int(x_a), int(y_a)), 6, Pose.kpts_colors['a'], -1)
+            kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
+            
+            global_kpt_b_id = self.keypoints[kpt_b_id, 0]
+            if global_kpt_b_id != -1:
+                x_b, y_b = self.keypoints[kpt_b_id]
+                cv2.circle(img, (int(x_b), int(y_b)), 6, Pose.kpts_colors['b'], -1)
+            if global_kpt_a_id != -1 and global_kpt_b_id != -1:
+                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.color, 5)
+    
+    def draw_skeleton(self, img):
+        grey_value = 128  # Adjust this value to change the grey tone
+        skeleton_color = (grey_value, grey_value, grey_value)  # BGR format for grey
+        # skeleton_color = tuple(list(Pose.kpts_colors['a'][:3]) + [int(255 * 0.5)])
+        assert self.keypoints.shape == (Pose.num_kpts, 2)
+        
+        # img_copy = img.copy()
+        
+        for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
+            kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
+            global_kpt_a_id = self.keypoints[kpt_a_id, 0]
+            if global_kpt_a_id != -1:
+                x_a, y_a = self.keypoints[kpt_a_id]
+                cv2.circle(img, (int(x_a), int(y_a)), 6, skeleton_color, -1)
             kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
             global_kpt_b_id = self.keypoints[kpt_b_id, 0]
             if global_kpt_b_id != -1:
                 x_b, y_b = self.keypoints[kpt_b_id]
-                cv2.circle(img, (int(x_b), int(y_b)), 3, Pose.color, -1)
+                cv2.circle(img, (int(x_b), int(y_b)), 6, skeleton_color, -1)
             if global_kpt_a_id != -1 and global_kpt_b_id != -1:
-                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.color, 2)
+                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 50)
+
+        # Blend the semi-transparent line with the original image
+        alpha = 0.5  # Adjust this value to change the transparency level
+        # img = cv2.addWeighted(img_copy, alpha, img, 1 - alpha, 0)
 
 
 def get_similarity(a, b, threshold=0.5):
