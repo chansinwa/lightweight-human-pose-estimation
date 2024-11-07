@@ -3060,7 +3060,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
         # skeleton_img = cv2.addWeighted(img, 0.1, skeleton_img, 0.9, 0)
 
         # Combine the tracked image and the raw image
-        img = cv2.addWeighted(orig_img, 0.9, img, 0.1, 0)
+        img = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
 
         for pose in current_poses:
             cv2.rectangle(
@@ -3206,3 +3206,6 @@ if __name__ == "__main__":
         args.track,
         args.smooth,
     )
+    
+    # Add this line to prevent the OpenCV windows from closing automatically
+    cv2.waitKey(0)
