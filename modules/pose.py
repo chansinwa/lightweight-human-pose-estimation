@@ -72,6 +72,10 @@ class Pose:
                 cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.color, 2)
 
     #added by Sita 07/11/2024)
+    
+    def is_valid_point(self, point):
+        #Check if the point is valid (not None and has valid coordinates).
+        return point is not None and all(coord != -1 for coord in point)
     def calculate_angle(self, a, b, c):
         if a is None or b is None or c is None:
             return None
@@ -85,10 +89,10 @@ class Pose:
         c_length = np.linalg.norm(a-b)
 
         #use law of cosines to find angle C
-        #cos(C) = (a^2 + b^2 - c^2) / 2ab
-        angle = np.arccos((a_length**2 + b_length**2 - c_length**2) / (2 * a_length * b_length))
+        #cos(B) = (a^2 + c^2 - b^2) / 2ac
+        angle = np.arccos((a_length**2 + c_length**2 - b_length**2) / (2 * a_length * c_length))
         return np.degrees(angle) #convert to degrees
-
+                                     
     def draw_angles(self, img):
         # Get keypoints coordinates
         RShoulder = self.keypoints[self.BODY_PARTS["RShoulder"]]
@@ -103,21 +107,24 @@ class Pose:
         r_arm_angle = self.calculate_angle(RShoulder, RElbow, RWrist)
         l_arm_angle = self.calculate_angle(LShoulder, LElbow, LWrist)
 
-        cv2.line(img, tuple(RShoulder), tuple(RElbow), (0, 255, 0), 3)  # Right Arm
-        cv2.line(img, tuple(RElbow), tuple(RWrist), (0, 255, 0), 3)  
-        cv2.ellipse(img, tuple(RShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-        cv2.ellipse(img, tuple(RElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-        cv2.ellipse(img, tuple(RWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-        if r_arm_angle is not None:
-            cv2.putText(img, f"{r_arm_angle:.2f}", tuple(RElbow), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-
-        cv2.line(img, tuple(LShoulder), tuple(LElbow), (0, 255, 0), 3)  # Left Arm
-        cv2.line(img, tuple(LElbow), tuple(LWrist), (0, 255, 0), 3)  
-        cv2.ellipse(img, tuple(LShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-        cv2.ellipse(img, tuple(LElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-        cv2.ellipse(img, tuple(LWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-        if l_arm_angle is not None:
-            cv2.putText(img, f"{l_arm_angle:.2f}", tuple(LElbow), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        # Right Arm
+        if self.is_valid_point(RShoulder) and self.is_valid_point(RElbow) and self.is_valid_point(RWrist):
+            cv2.line(img, tuple(RShoulder), tuple(RElbow), (0, 255, 0), 3)  
+            cv2.line(img, tuple(RElbow), tuple(RWrist), (0, 255, 0), 3)  
+            cv2.ellipse(img, tuple(RShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            cv2.ellipse(img, tuple(RElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            cv2.ellipse(img, tuple(RWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            if r_arm_angle is not None:
+                cv2.putText(img, f"{r_arm_angle:.2f}", tuple(RElbow), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        # Left Arm
+        if self.is_valid_point(LShoulder) and self.is_valid_point(LElbow) and self.is_valid_point(LWrist):
+            cv2.line(img, tuple(LShoulder), tuple(LElbow), (0, 255, 0), 3)
+            cv2.line(img, tuple(LElbow), tuple(LWrist), (0, 255, 0), 3)  
+            cv2.ellipse(img, tuple(LShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            cv2.ellipse(img, tuple(LElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            cv2.ellipse(img, tuple(LWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            if l_arm_angle is not None:
+                cv2.putText(img, f"{l_arm_angle:.2f}", tuple(LElbow), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
 def get_similarity(a, b, threshold=0.5):
     num_similar_kpt = 0
