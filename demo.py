@@ -236,6 +236,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
         skeleton_img = np.zeros(
             (img.shape[0], img.shape[1], 4), dtype=np.uint8
         )  # Add an alpha channel
+        skeleton_img[:, :, :3] = [255, 255, 255]  # Set RGB values to white color
         skeleton_img[:, :, 3] = 0  # Set alpha channel to 0 for full transparency
 
         for pose in current_poses:
@@ -245,9 +246,6 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
             else:
                 # webcam real-time detection
                 pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_num]) # pass the 18 skeleton keypoints of the current frame
-
-        # Replace the white background with transparency
-        skeleton_img[skeleton_img[:, :, 3] == 255] = [0, 0, 0, 0]
 
         # Combine the tracked image and the raw image on video tracking
         img = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)

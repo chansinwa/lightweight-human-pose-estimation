@@ -82,6 +82,7 @@ class Pose:
         assert self.keypoints.shape == (Pose.num_kpts, 2)
         
         if kpts_list is None:
+            # video detection
             for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
                 kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
                 global_kpt_a_id = self.keypoints[kpt_a_id, 0]
@@ -96,18 +97,25 @@ class Pose:
                 if global_kpt_a_id != -1 and global_kpt_b_id != -1:
                     cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 50)
         else:
+            # webcam real-time detection
             kpt_coords = {kpt['kpt_id']: tuple(kpt['coords']) for kpt in kpts_list}
             print("kpts_list: ", kpts_list)
+            
+            scaling_factor = 1.35  # Adjust this value to increase or decrease the size
 
             for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
                 kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
                 if kpt_a_id in kpt_coords:
                     x_a, y_a = kpt_coords[kpt_a_id]
+                    x_a *= scaling_factor
+                    y_a *= scaling_factor
                 kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
                 if kpt_b_id in kpt_coords:
                     x_b, y_b = kpt_coords[kpt_b_id]
+                    x_b *= scaling_factor
+                    y_b *= scaling_factor
                 if kpt_a_id in kpt_coords and kpt_b_id in kpt_coords:
-                    cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 50)
+                    cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)
                 
 
 
