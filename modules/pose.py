@@ -74,32 +74,41 @@ class Pose:
                 cv2.circle(img, (int(x_b), int(y_b)), 6, Pose.kpts_colors['b'], -1)
             if global_kpt_a_id != -1 and global_kpt_b_id != -1:
                 cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.color, 5)
-    
-    def draw_skeleton(self, img):
-        grey_value = 128  # Adjust this value to change the grey tone
-        skeleton_color = (grey_value, grey_value, grey_value)  # BGR format for grey
-        # skeleton_color = tuple(list(Pose.kpts_colors['a'][:3]) + [int(255 * 0.5)])
+
+    def draw_skeleton(self, img, kpts_list = None):
+        grey_value = 10  # Adjust this value to change the grey tone
+        skeleton_color = (grey_value, grey_value, grey_value)  # BGR format for grey line color
+        skeleton_color = tuple(list(skeleton_color[:3]) + [int(255 * 0.9)]) # Add transparency to the grey line color
         assert self.keypoints.shape == (Pose.num_kpts, 2)
         
-        # img_copy = img.copy()
-        
-        for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
-            kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
-            global_kpt_a_id = self.keypoints[kpt_a_id, 0]
-            if global_kpt_a_id != -1:
-                x_a, y_a = self.keypoints[kpt_a_id]
-                cv2.circle(img, (int(x_a), int(y_a)), 6, skeleton_color, -1)
-            kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
-            global_kpt_b_id = self.keypoints[kpt_b_id, 0]
-            if global_kpt_b_id != -1:
-                x_b, y_b = self.keypoints[kpt_b_id]
-                cv2.circle(img, (int(x_b), int(y_b)), 6, skeleton_color, -1)
-            if global_kpt_a_id != -1 and global_kpt_b_id != -1:
-                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 50)
+        if kpts_list is None:
+            for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
+                kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
+                global_kpt_a_id = self.keypoints[kpt_a_id, 0]
+                if global_kpt_a_id != -1:
+                    x_a, y_a = self.keypoints[kpt_a_id]
+                    cv2.circle(img, (int(x_a), int(y_a)), 6, skeleton_color, -1)
+                kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
+                global_kpt_b_id = self.keypoints[kpt_b_id, 0]
+                if global_kpt_b_id != -1:
+                    x_b, y_b = self.keypoints[kpt_b_id]
+                    cv2.circle(img, (int(x_b), int(y_b)), 6, skeleton_color, -1)
+                if global_kpt_a_id != -1 and global_kpt_b_id != -1:
+                    cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 50)
+        else:
+            kpt_coords = {kpt['kpt_id']: tuple(kpt['coords']) for kpt in kpts_list}
+            print("kpts_list: ", kpts_list)
 
-        # Blend the semi-transparent line with the original image
-        alpha = 0.5  # Adjust this value to change the transparency level
-        # img = cv2.addWeighted(img_copy, alpha, img, 1 - alpha, 0)
+            for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
+                kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
+                if kpt_a_id in kpt_coords:
+                    x_a, y_a = kpt_coords[kpt_a_id]
+                kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
+                if kpt_b_id in kpt_coords:
+                    x_b, y_b = kpt_coords[kpt_b_id]
+                if kpt_a_id in kpt_coords and kpt_b_id in kpt_coords:
+                    cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 50)
+                
 
 
 def get_similarity(a, b, threshold=0.5):
