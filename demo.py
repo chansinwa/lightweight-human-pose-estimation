@@ -175,6 +175,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
             previous_poses = current_poses
         for pose in current_poses:
             pose.draw(img)
+            pose.draw_angles(img)
             
             
         img = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
@@ -199,7 +200,8 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
                 #     print(info)
                 
                 fps = round(frame_num / (time.time() - start_time), 2)  # Calculate FPS
-                print(f"Frame: {frame_num}, FPS: {fps}")
+                #print(f"Frame: {frame_num}, FPS: {fps}")
+
                 # Write the info on the img, Tommy, 02-11-2024
                 img = console_log(img, {
                     'filename': filename,
@@ -254,3 +256,4 @@ if __name__ == '__main__':
         args.track = 0
 
     run_demo(net, frame_provider, args.height_size, args.cpu, args.track, args.smooth)
+    cv2.waitKey(0)

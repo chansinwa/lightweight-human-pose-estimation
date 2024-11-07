@@ -1,3 +1,4 @@
+import math
 import cv2
 import numpy as np
 
@@ -17,6 +18,15 @@ class Pose:
     vars = (sigmas * 2) ** 2
     last_id = -1
     color = [0, 224, 255]
+
+    #added by Sita 07/11/2024
+    #BODY_PARTS dictionary to map the keypoints to the corresponding index with a readability
+    BODY_PARTS = {
+        "Nose": 0, "Neck": 1, "RShoulder": 2, "RElbow": 3, "RWrist": 4,
+        "LShoulder": 5, "LElbow": 6, "LWrist": 7, "RHip": 8, "RKnee": 9,
+        "RAnkle": 10, "LHip": 11, "LKnee": 12, "LAnkle": 13, "REye": 14,
+        "LEye": 15, "REar": 16, "LEar": 17, "Background": 18
+    }
 
     def __init__(self, keypoints, confidence):
         super().__init__()
@@ -61,6 +71,53 @@ class Pose:
             if global_kpt_a_id != -1 and global_kpt_b_id != -1:
                 cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.color, 2)
 
+    #added by Sita 07/11/2024)
+    def calculate_angle(self, a, b, c):
+        if a is None or b is None or c is None:
+            return None
+        
+        a = np.array(a)
+        b = np.array(b)
+        c = np.array(c)
+   
+        a_length = np.linalg.norm(b-c)
+        b_length = np.linalg.norm(a-c)
+        c_length = np.linalg.norm(a-b)
+
+        #use law of cosines to find angle C
+        #cos(C) = (a^2 + b^2 - c^2) / 2ab
+        angle = np.arccos((a_length**2 + b_length**2 - c_length**2) / (2 * a_length * b_length))
+        return np.degrees(angle) #convert to degrees
+
+    def draw_angles(self, img):
+        # Get keypoints coordinates
+        RShoulder = self.keypoints[self.BODY_PARTS["RShoulder"]]
+        RElbow = self.keypoints[self.BODY_PARTS["RElbow"]]
+        RWrist = self.keypoints[self.BODY_PARTS["RWrist"]]
+
+        LShoulder = self.keypoints[self.BODY_PARTS["LShoulder"]]
+        LElbow = self.keypoints[self.BODY_PARTS["LElbow"]]
+        LWrist = self.keypoints[self.BODY_PARTS["LWrist"]]
+
+        # Calculate angles
+        r_arm_angle = self.calculate_angle(RShoulder, RElbow, RWrist)
+        l_arm_angle = self.calculate_angle(LShoulder, LElbow, LWrist)
+
+        cv2.line(img, tuple(RShoulder), tuple(RElbow), (0, 255, 0), 3)  # Right Arm
+        cv2.line(img, tuple(RElbow), tuple(RWrist), (0, 255, 0), 3)  
+        cv2.ellipse(img, tuple(RShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+        cv2.ellipse(img, tuple(RElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+        cv2.ellipse(img, tuple(RWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+        if r_arm_angle is not None:
+            cv2.putText(img, f"{r_arm_angle:.2f}", tuple(RElbow), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+
+        cv2.line(img, tuple(LShoulder), tuple(LElbow), (0, 255, 0), 3)  # Left Arm
+        cv2.line(img, tuple(LElbow), tuple(LWrist), (0, 255, 0), 3)  
+        cv2.ellipse(img, tuple(LShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+        cv2.ellipse(img, tuple(LElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+        cv2.ellipse(img, tuple(LWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+        if l_arm_angle is not None:
+            cv2.putText(img, f"{l_arm_angle:.2f}", tuple(LElbow), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
 def get_similarity(a, b, threshold=0.5):
     num_similar_kpt = 0
@@ -116,3 +173,5 @@ def track_poses(previous_poses, current_poses, threshold=3, smooth=False):
                 current_pose.keypoints[kpt_id, 0] = current_pose.filters[kpt_id][0](current_pose.keypoints[kpt_id, 0])
                 current_pose.keypoints[kpt_id, 1] = current_pose.filters[kpt_id][1](current_pose.keypoints[kpt_id, 1])
             current_pose.bbox = Pose.get_bbox(current_pose.keypoints)
+
+
