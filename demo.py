@@ -178,7 +178,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
             pose.draw_angles(img)
             
             
-        img = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
+        img = cv2.addWeighted(orig_img, 0.2, img, 0.8, 0)
         
         
 
@@ -212,6 +212,10 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
                 image_name = "frame_" + str(frame_num) + ".jpg"
                 cv2.imwrite(export_path + image_name, img)
                 
+                # cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
+                # img_with_alpha = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+                # combined_img = np.hstack((img_with_alpha, skeleton_img))
+                # cv2.imshow("Original and Skeleton", combined_img)
                 
         cv2.imshow('Lightweight Human Pose Estimation Python Demo', img)
         key = cv2.waitKey(delay)
