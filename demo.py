@@ -6,6 +6,7 @@ import torch
 import os
 import datetime
 import shutil
+import time
 
 from models.with_mobilenet import PoseEstimationWithMobileNet
 from modules.keypoints import extract_keypoints, group_keypoints
@@ -95,7 +96,8 @@ def console_log(img, msg):
     
     lines = [
         "inputed file: " + str(msg['filename']),
-        "frame: " + str(msg['frame_num'])
+        "frame: " + str(msg['frame_num']),
+        "FPS: " + str(msg['FPS'])
     ]
     
     y = org[1]
@@ -120,7 +122,6 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
     delay = 1
     
     # code for saving files, Tommy, 02-11-2024
-    frame_num = 0
     current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
     try:
         filename = os.path.basename(image_provider.file_name)
@@ -136,6 +137,11 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
     
     print("imported file:", filename)
     # code for saving files
+
+    keypoints_info = []
+    
+    frame_num = 0
+    start_time = time.time()  # Start time for calculating FPS
     
     for img in image_provider:
         orig_img = img.copy()
@@ -150,6 +156,8 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
         for kpt_id in range(all_keypoints.shape[0]):
             all_keypoints[kpt_id, 0] = (all_keypoints[kpt_id, 0] * stride / upsample_ratio - pad[1]) / scale
             all_keypoints[kpt_id, 1] = (all_keypoints[kpt_id, 1] * stride / upsample_ratio - pad[0]) / scale
+        
+
         current_poses = []
         for n in range(len(pose_entries)):
             if len(pose_entries[n]) == 0:
@@ -167,26 +175,47 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
             previous_poses = current_poses
         for pose in current_poses:
             pose.draw(img)
+            pose.draw_angles(img)
             
             
-        img = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
+        img = cv2.addWeighted(orig_img, 0.2, img, 0.8, 0)
         
+        
+
         for pose in current_poses:
             cv2.rectangle(img, (pose.bbox[0], pose.bbox[1]),
                           (pose.bbox[0] + pose.bbox[2], pose.bbox[1] + pose.bbox[3]), (0, 255, 0))
             if track:
                 cv2.putText(img, 'id: {}'.format(pose.id), (pose.bbox[0], pose.bbox[1] - 16),
                             cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255))
+
+                for i, keypoint in enumerate(pose.keypoints):
+                    kpt_id = i
+                    kpt_name = Pose.kpt_names[i]
+                    x, y = keypoint
+                    keypoints_info.append({"frame_id": frame_num, "kpt_id": kpt_id, "kpt_name": kpt_name, "coords": [x, y]})
+
+                # Print the new array of objects in the desired format
+                # for info in keypoints_info:
+                #     print(info)
                 
+                fps = round(frame_num / (time.time() - start_time), 2)  # Calculate FPS
+                #print(f"Frame: {frame_num}, FPS: {fps}")
+
                 # Write the info on the img, Tommy, 02-11-2024
-                console_log(img, {
+                img = console_log(img, {
                     'filename': filename,
-                    'frame_num': frame_num
+                    'frame_num': frame_num,
+                    "FPS": fps
                 })
                 # Save the image, Tommy, 02-11-2024
                 image_name = "frame_" + str(frame_num) + ".jpg"
                 cv2.imwrite(export_path + image_name, img)
                 
+                # cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
+                # img_with_alpha = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+                # combined_img = np.hstack((img_with_alpha, skeleton_img))
+                # cv2.imshow("Original and Skeleton", combined_img)
                 
         cv2.imshow('Lightweight Human Pose Estimation Python Demo', img)
         key = cv2.waitKey(delay)
@@ -207,7 +236,7 @@ if __name__ == '__main__':
         description='''Lightweight human pose estimation python demo.
                        This is just for quick results preview.
                        Please, consider c++ demo for the best performance.''')
-    parser.add_argument('--checkpoint-path', type=str, required=True, help='path to the checkpoint')
+    parser.add_argument('--checkpoint-path', type=str, default="checkpoint_iter_370000.pth", help='path to the checkpoint')
     parser.add_argument('--height-size', type=int, default=256, help='network input layer height size')
     parser.add_argument('--video', type=str, default='', help='path to video file or camera id')
     parser.add_argument('--images', nargs='+', default='', help='path to input image(s)')
@@ -231,3 +260,4 @@ if __name__ == '__main__':
         args.track = 0
 
     run_demo(net, frame_provider, args.height_size, args.cpu, args.track, args.smooth)
+    cv2.waitKey(0)
