@@ -154,7 +154,7 @@ class Pose:
             if r_arm_angle is not None:
                 # cv2.putText(img, f"{r_arm_angle:.2f}", tuple(RElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_r, (0, 0, 0), 2)
                 self.draw_text_with_outline(img, f"{r_arm_angle:.1f}", tuple(RElbow), font_scale_r, 2)
-                # self.draw_angle_sector(img, tuple(RElbow), RShoulder, RWrist) //add later when need draw arc
+                # self.draw_angle_sector(img, tuple(RElbow), RShoulder, RWrist) 
                 
 
         # Left Arm
@@ -167,7 +167,7 @@ class Pose:
             if l_arm_angle is not None:
                 # cv2.putText(img, f"{l_arm_angle:.2f}", tuple(LElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_l, (0, 0, 0), 2)
                 self.draw_text_with_outline(img, f"{l_arm_angle:.1f}", tuple(LElbow), font_scale_l, 2)
-                # self.draw_angle_sector(img, tuple(LElbow), LShoulder, LWrist) //add later when need draw arc
+                # self.draw_angle_sector(img, tuple(LElbow), LShoulder, LWrist) 
 
     
 
