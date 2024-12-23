@@ -54,7 +54,7 @@ class Pose:
             self.id = Pose.last_id + 1
             Pose.last_id += 1
 
-    def draw(self, img):
+    def draw(self, img, frame_id = None, kpts_list = None):
         assert self.keypoints.shape == (Pose.num_kpts, 2)
 
         for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
@@ -71,8 +71,16 @@ class Pose:
                 cv2.circle(img, (int(x_b), int(y_b)), 6, Pose.kpts_colors, -1)
             if global_kpt_a_id != -1 and global_kpt_b_id != -1:
                 cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.color, 5)
+                
+            # if kpts_list is not None:
+            #     # Draw the keypoint ID on the webcam view
+            #     kpt_coords = {kpt['kpt_id']: tuple(kpt['coords']) for kpt in kpts_list}
+            #     for kpt_id, (x, y) in kpt_coords.items():
+            #         cv2.putText(img, str(kpt_id), (int(x), int(y)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+            #         print()
+                 
 
-    def draw_skeleton(self, img, kpts_list = None):
+    def draw_skeleton(self, img, kpts_list = None, rms_values=None):
         grey_value = 10  # Adjust this value to change the grey tone
         skeleton_color = (grey_value, grey_value, grey_value)  # BGR format for grey line color
         skeleton_color = tuple(list(skeleton_color[:3]) + [int(255 * 0.9)]) # Add transparency to the grey line color
@@ -96,10 +104,11 @@ class Pose:
         else:
             # webcam real-time detection (draw the skeleton on the center of camera view)
             kpt_coords = {kpt['kpt_id']: tuple(kpt['coords']) for kpt in kpts_list}
-            print("kpts_list: ", kpts_list)
+                        
+            # print("webcam kpts_list: ", kpts_list)
             
+            # ======================================================================================================
             # scaling_factor = 1.35  # Adjust this value to increase or decrease the size
-
             # for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
             #     kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
             #     if kpt_a_id in kpt_coords:
@@ -112,19 +121,45 @@ class Pose:
             #         x_b *= scaling_factor
             #         y_b *= scaling_factor
             #     if kpt_a_id in kpt_coords and kpt_b_id in kpt_coords:
-            #         cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)
-            
+            #         cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)  
             # ======================================================================================================
+            
             # Scaling and positioning the skeleton in the real-time webcam view
             scaling_factor = 1.35  # Adjust this value to increase or decrease the size
             scaled_keypoints = {}  # Dictionary to store scaled keypoints
 
             for kpt_id, (x, y) in kpt_coords.items():
                 scaled_keypoints[kpt_id] = (x * scaling_factor, y * scaling_factor)
+                
+                # # Draw RMS value if available
+                # if rms_values is not None and kpt_id in rms_values and rms_values[kpt_id]['rms'] is not None:
+                #     rms_text = "RMS: {:.2f}".format(rms_values[kpt_id]['rms'])  # Format RMS value
+                #     coords_x, coords_y = rms_values[kpt_id]['coords']
+                #     cv2.putText(img, rms_text, (int(coords_x), int(coords_y) - 10),  # Position the text above the keypoint
+                #                 cv2.FONT_HERSHEY_SIMPLEX, 
+                #                 0.5, 
+                #                 (0, 0, 255),  # Color (red in BGR)
+                #                 1, 
+                #                 cv2.LINE_AA)
+                # elif rms_values is not None and kpt_id in rms_values:
+                #     # Optionally, display "N/A" if RMS is not available
+                #     coords_x, coords_y = rms_values[kpt_id]['coords']
+                #     cv2.putText(img, "RMS: N/A", (int(coords_x), int(coords_y) - 10), 
+                #                 cv2.FONT_HERSHEY_SIMPLEX, 
+                #                 0.5, 
+                #                 (0, 255, 0),  # Color (red in BGR)
+                #                 1, 
+                #                 cv2.LINE_AA)
 
             # Calculate the centroid of the scaled body shape
-            centroid_x = sum(x for x, y in scaled_keypoints.values()) / len(scaled_keypoints)
-            centroid_y = sum(y for x, y in scaled_keypoints.values()) / len(scaled_keypoints)
+            if scaled_keypoints:
+                centroid_x = sum(x for x, y in scaled_keypoints.values()) / len(scaled_keypoints)
+                centroid_y = sum(y for x, y in scaled_keypoints.values()) / len(scaled_keypoints)
+            else:
+                # Handle the case where scaled_keypoints is empty
+                centroid_x = 0  # Set a default value or handle it accordingly
+                centroid_y = 0
+                return
 
             # Calculate the translation needed to move the centroid to the center of the OpenCV window
             window_center_x = img.shape[1] // 2
