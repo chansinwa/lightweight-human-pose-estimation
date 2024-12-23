@@ -79,7 +79,6 @@ class Pose:
             #         cv2.putText(img, str(kpt_id), (int(x), int(y)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
             #         print()
                  
-
     def draw_skeleton(self, img, kpts_list = None, rms_values=None):
         grey_value = 10  # Adjust this value to change the grey tone
         skeleton_color = (grey_value, grey_value, grey_value)  # BGR format for grey line color

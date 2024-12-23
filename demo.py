@@ -23,7 +23,6 @@ device = torch.device(
     "mps" if torch.backends.mps.is_available() else "cpu"
 )  # additional import for device configuration
 
-
 # Load the JSON data from the file
 skeleton_list = []
 with open('kpts_list.json', 'r') as file:
