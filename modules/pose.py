@@ -71,13 +71,13 @@ class Pose:
                 cv2.circle(img, (int(x_b), int(y_b)), 6, Pose.kpts_colors, -1)
             if global_kpt_a_id != -1 and global_kpt_b_id != -1:
                 cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.color, 5)
-                
-            # if kpts_list is not None:
-            #     # Draw the keypoint ID on the webcam view
-            #     kpt_coords = {kpt['kpt_id']: tuple(kpt['coords']) for kpt in kpts_list}
-            #     for kpt_id, (x, y) in kpt_coords.items():
-            #         cv2.putText(img, str(kpt_id), (int(x), int(y)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
-            #         print()
+            
+        
+        ## Draw the four corners of the screen
+        cv2.circle(img, (0, 0), 20, (255, 0, 0), -1)
+        cv2.circle(img, (0, img.shape[0]), 20, (0, 255, 0), -1)
+        cv2.circle(img, (img.shape[1], 0), 20, (255, 0, 0), -1)
+        cv2.circle(img, (img.shape[1], img.shape[0]), 20, (0, 255, 0), -1)
                  
     def draw_skeleton(self, img, kpts_list = None, rms_values=None):
         grey_value = 10  # Adjust this value to change the grey tone
@@ -86,7 +86,7 @@ class Pose:
         assert self.keypoints.shape == (Pose.num_kpts, 2)
         
         if kpts_list is None:
-            # video detection (draw the skeleton on the right side of the window)
+            ### video detection (draw the skeleton on the right side of the window)
             for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
                 kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
                 global_kpt_a_id = self.keypoints[kpt_a_id, 0]
@@ -100,55 +100,60 @@ class Pose:
                     cv2.circle(img, (int(x_b), int(y_b)), 6, skeleton_color, -1)
                 if global_kpt_a_id != -1 and global_kpt_b_id != -1:
                     cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 50)
+            
         else:
             # webcam real-time detection (draw the skeleton on the center of camera view)
             kpt_coords = {kpt['kpt_id']: tuple(kpt['coords']) for kpt in kpts_list}
                         
             # print("webcam kpts_list: ", kpts_list)
             
-            # ======================================================================================================
-            # scaling_factor = 1.35  # Adjust this value to increase or decrease the size
-            # for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
-            #     kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
-            #     if kpt_a_id in kpt_coords:
-            #         x_a, y_a = kpt_coords[kpt_a_id]
-            #         x_a *= scaling_factor
-            #         y_a *= scaling_factor
-            #     kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
-            #     if kpt_b_id in kpt_coords:
-            #         x_b, y_b = kpt_coords[kpt_b_id]
-            #         x_b *= scaling_factor
-            #         y_b *= scaling_factor
-            #     if kpt_a_id in kpt_coords and kpt_b_id in kpt_coords:
-            #         cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)  
-            # ======================================================================================================
+            """
+            scaling_factor = 1.35  # Adjust this value to increase or decrease the size
+            for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
+                kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
+                if kpt_a_id in kpt_coords:
+                    x_a, y_a = kpt_coords[kpt_a_id]
+                    x_a *= scaling_factor
+                    y_a *= scaling_factor
+                kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
+                if kpt_b_id in kpt_coords:
+                    x_b, y_b = kpt_coords[kpt_b_id]
+                    x_b *= scaling_factor
+                    y_b *= scaling_factor
+                if kpt_a_id in kpt_coords and kpt_b_id in kpt_coords:
+                    cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)  
+            """
             
+            ### Normalize Coordinates
             # Scaling and positioning the skeleton in the real-time webcam view
             scaling_factor = 1.35  # Adjust this value to increase or decrease the size
             scaled_keypoints = {}  # Dictionary to store scaled keypoints
+            normalized_kpt_list = []
 
             for kpt_id, (x, y) in kpt_coords.items():
                 scaled_keypoints[kpt_id] = (x * scaling_factor, y * scaling_factor)
                 
-                # # Draw RMS value if available
-                # if rms_values is not None and kpt_id in rms_values and rms_values[kpt_id]['rms'] is not None:
-                #     rms_text = "RMS: {:.2f}".format(rms_values[kpt_id]['rms'])  # Format RMS value
-                #     coords_x, coords_y = rms_values[kpt_id]['coords']
-                #     cv2.putText(img, rms_text, (int(coords_x), int(coords_y) - 10),  # Position the text above the keypoint
-                #                 cv2.FONT_HERSHEY_SIMPLEX, 
-                #                 0.5, 
-                #                 (0, 0, 255),  # Color (red in BGR)
-                #                 1, 
-                #                 cv2.LINE_AA)
-                # elif rms_values is not None and kpt_id in rms_values:
-                #     # Optionally, display "N/A" if RMS is not available
-                #     coords_x, coords_y = rms_values[kpt_id]['coords']
-                #     cv2.putText(img, "RMS: N/A", (int(coords_x), int(coords_y) - 10), 
-                #                 cv2.FONT_HERSHEY_SIMPLEX, 
-                #                 0.5, 
-                #                 (0, 255, 0),  # Color (red in BGR)
-                #                 1, 
-                #                 cv2.LINE_AA)
+                """
+                ## Draw RMS value if available
+                if rms_values is not None and kpt_id in rms_values and rms_values[kpt_id]['rms'] is not None:
+                    rms_text = "RMS: {:.2f}".format(rms_values[kpt_id]['rms'])  # Format RMS value
+                    coords_x, coords_y = rms_values[kpt_id]['coords']
+                    cv2.putText(img, rms_text, (int(coords_x), int(coords_y) - 10),  # Position the text above the keypoint
+                                cv2.FONT_HERSHEY_SIMPLEX, 
+                                0.5, 
+                                (0, 0, 255),  # Color (red in BGR)
+                                1, 
+                                cv2.LINE_AA)
+                elif rms_values is not None and kpt_id in rms_values:
+                    # Optionally, display "N/A" if RMS is not available
+                    coords_x, coords_y = rms_values[kpt_id]['coords']
+                    cv2.putText(img, "RMS: N/A", (int(coords_x), int(coords_y) - 10), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 
+                                0.5, 
+                                (0, 255, 0),  # Color (red in BGR)
+                                1, 
+                                cv2.LINE_AA)
+                """
 
             # Calculate the centroid of the scaled body shape
             if scaled_keypoints:

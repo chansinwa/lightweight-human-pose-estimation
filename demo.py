@@ -7,6 +7,7 @@ import os
 import datetime
 import shutil
 import time
+import psutil
 
 import threading
 import pandas as pd
@@ -18,18 +19,17 @@ from modules.load_state import load_state
 from modules.pose import Pose, track_poses
 from val import normalize, pad_width
 
-# change here
 device = torch.device(
     "mps" if torch.backends.mps.is_available() else "cpu"
-)  # additional import for device configuration
+)  ## additional import for device configuration
 
-# Load the JSON data from the file
+## Load the JSON data from the file
 skeleton_list = []
 with open('kpts_list.json', 'r') as file:
     skeleton_list = json.load(file)
     
 def calculate_rms(checkpoints, real_time_keypoints):
-    # Create a dictionary for quick lookup of real-time keypoints by (frame_id, kpt_id)
+    ## Create a dictionary for quick lookup of real-time keypoints by (frame_id, kpt_id)
     real_time_dict = {
         (kp['frame_id'], kp['kpt_id']): kp['coords']
         for kp in real_time_keypoints
@@ -37,43 +37,43 @@ def calculate_rms(checkpoints, real_time_keypoints):
     
     updated_realtime_kpts = []
 
-    # List to store distances for RMS calculation
+    ## List to store distances for RMS calculation
     distances = []
 
-    # Iterate through each checkpoint
+    ## Iterate through each checkpoint
     for checkpoint in checkpoints:
         frame_id = checkpoint['frame_id']
         kpt_id = checkpoint['kpt_id']
         checkpoint_coords = checkpoint['coords']
         
-        # Create a base object for the current keypoint
+        ## Create a base object for the current keypoint
         keypoint_info = {
             "frame_id": frame_id,
             "kpt_id": kpt_id,
-            "kpt_name": checkpoint.get('kpt_name', ''),  # Include kpt_name if available
+            "kpt_name": checkpoint.get('kpt_name', ''),  ## Include kpt_name if available
             "coords": checkpoint_coords,
         }
 
-        # Check if the corresponding real-time keypoint exists
+        ## Check if the corresponding real-time keypoint exists
         if (frame_id, kpt_id) in real_time_dict:
             real_time_coords = real_time_dict[(frame_id, kpt_id)]
             
-            # Calculate Euclidean distance
+            ## Calculate Euclidean distance
             distance = np.linalg.norm(np.array(checkpoint_coords) - np.array(real_time_coords))
             distances.append(distance)
             
-            keypoint_info["rms"] = distance  # Store the distance as RMS for this keypoint
+            keypoint_info["rms"] = distance  ## Store the distance as RMS for this keypoint
         else:
-            keypoint_info["rms"] = None  # No corresponding real-time keypoint found
+            keypoint_info["rms"] = None  ## No corresponding real-time keypoint found
         
         updated_realtime_kpts.append(keypoint_info)
 
-    # Calculate RMS if there are distances to compute
+    ## Calculate RMS if there are distances to compute
     if distances:
         rms = np.sqrt(np.mean(np.square(distances)))
         return updated_realtime_kpts
     else:
-        return None  # No matching keypoints found
+        return None  ## No matching keypoints found
     
 def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
     """
@@ -98,7 +98,7 @@ def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
 def combine_keypoints_with_rms(ref_ckpt_list, keypoints_info):
     combined_list = []
 
-    # Create a dictionary for quick lookup of reference keypoints by (frame_id, kpt_id)
+    ## Create a dictionary for quick lookup of reference keypoints by (frame_id, kpt_id)
     ref_dict = {
         (kp['frame_id'], kp['kpt_id']): kp['coords']
         for kp in ref_ckpt_list
@@ -243,6 +243,9 @@ def console_log(img, msg):
     lines = [
         "inputed file: " + str(msg["filename"]),
         "frame: " + str(msg["frame_num"]),
+        "screen size: " + str(msg["screen_size"]),
+        "fps: " + str(msg["fps"]),
+        "cpu load: " + str(msg["cpu_load"]) + "%",
     ]
 
     y = org[1]
@@ -255,12 +258,15 @@ def console_log(img, msg):
     return img
 
 
+
 def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list=None):      
     net = net.eval()
     # if not cpu:
     #     net = net.cuda()
     net = net.to(device)  # Change here
 
+    fps_time = 0
+    
     stride = 8
     upsample_ratio = 4
     num_keypoints = Pose.num_kpts
@@ -288,7 +294,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
     # Initialize FPS calculation variables
     start_time = time.time()
     frame_count = 0
-    fps = 0
+    # fps = 0
 
     keypoints_info = []
 
@@ -356,14 +362,14 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
                 # webcam real-time detection
                 pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_num]) # pass the 18 skeleton keypoints of the current frame
                 
-                # # Calculate RMS for each keypoint
+                ## Calculate RMS for each keypoint
                 # updated_keypoints_info = calculate_rms(ref_ckpt_list, keypoints_info)
                 # if updated_keypoints_info:
                 #     # Create a dictionary for RMS values keyed by kpt_id
                 #     # rms_values = {keypoint['kpt_id']: keypoint['rms'] for keypoint in updated_keypoints_info}
                 #     rms_values = {keypoint['kpt_id']: {'rms': keypoint['rms'], 'coords': keypoint['coords']} for keypoint in updated_keypoints_info}
 
-                #     # Draw the skeleton and RMS values
+                #     ## Draw the skeleton and RMS values
                 #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_num], rms_values)  # Pass RMS values to draw_skeleton
                 # else:
                 #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_num])
@@ -404,63 +410,62 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
                         }
                     )
 
-                # Print the new array of objects in the desired format
+                ## Print the new array of objects in the desired format
                 # for info in keypoints_info:
                 #     print(info)
 
-                # # Create a DataFrame from the keypoints_info list
+                ## Create a DataFrame from the keypoints_info list
                 # df = pd.DataFrame(keypoints_info)
                 # # Export the DataFrame to an Excel file
                 # df.to_excel(export_path + "keypoints_info.xlsx", index=False)
 
-                # fps_time = time.time()
-                # Calculate FPS
                 frame_count += 1
-                if frame_count % 10 == 0:  # Calculate and display FPS every 10 frames
-                    elapsed_time = time.time() - start_time
-                    fps = frame_count / elapsed_time
 
+                ## Calculate the fps
+                fps = round(1.0 / (time.time() - fps_time), 2)
+                
+                ## Access the CPU usage
+                cpu_load = psutil.cpu_percent()
+                
                 # Write the info on the img, Tommy, 02-11-2024
-                console_log(img, {"filename": filename, "frame_num": frame_num})
+                console_log(img, {"filename": filename, "frame_num": frame_num, "screen_size": img.shape[:2], "fps": fps, "cpu_load": cpu_load})
                 # Save the image, Tommy, 02-11-2024
                 image_name = "frame_" + str(frame_num) + ".jpg"
                 
-                # this two lines are for saving images
-                # cv2.imwrite(export_path + image_name, img)
+                ## this two lines are for saving images
+                cv2.imwrite(export_path + image_name, img)
                 # cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
 
         # cv2.imshow("Lightweight Human Pose Estimation Python Demo", img)
         # cv2.imshow("Skeleton", skeleton_img)
  
-        # Show the tracked image and skeleton image side by side
+        ## Show the tracked image and skeleton image side by side
         if ref_ckpt_list is None: 
-            # video detection
+            ## video detection
             img_with_alpha = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
             combined_img = np.hstack((img_with_alpha, skeleton_img))
             cv2.imshow("Original and Skeleton", combined_img)
         else: 
-            # webcam real-time detection
+            ### webcam real-time detection
             
-            # calculate rms between the two checkpoints lists
+            ## calculate rms between the two checkpoints lists
             kpt_info = calculate_rms(ref_ckpt_list, keypoints_info)
             # print("RMS Distance:", rms_value)
                 
             cv2.imshow("Realtime webcam", img)
             
+            ## Make the new list with both keypoints_info, ref_ckpt_list, and the RMS value
+            combined_keypoints = combine_keypoints_with_rms(ref_ckpt_list, keypoints_info)
+            # print("Combined Keypoints with RMS:", combined_keypoints)
+            # this is for saving the text file of the checkpoint list
+            with open(f"{export_path}_combined_kpts.json", "w") as file:
+                file.write(str(combined_keypoints))
             
         
-        # Make the new list with both keypoints_info, ref_ckpt_list, and the RMS value
-        combined_keypoints = combine_keypoints_with_rms(ref_ckpt_list, keypoints_info)
-        # print("Combined Keypoints with RMS:", combined_keypoints)
-        # this is for saving the text file of the checkpoint list
-        with open(f"{export_path}_combined_kpts.json", "w") as file:
-            file.write(str(combined_keypoints))
-            
-        
-        # Resize the skeleton image to match the dimensions of the original image
+        ## Resize the skeleton image to match the dimensions of the original image
         # skeleton_img_resized = cv2.resize(skeleton_img, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_AREA)
 
-        # Blend the original image and the skeleton image
+        ## Blend the original image and the skeleton image
         # final_img = cv2.addWeighted(img, 0.8, skeleton_img_resized, 0.2, 0)
         # cv2.imshow(final_img)
 
@@ -474,11 +479,13 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
                 delay = 1
 
         frame_num += 1
+        fps_time = time.time()
+        
 
     # print the whole keypoints_info list
     # print("kpts_list:", keypoints_info)
     
-    # this is for saving the text file of the checkpoint list
+    ## this is for saving the text file of the checkpoint list
     with open(f"{export_path}_kpts.txt", "w") as file:
         file.write(str(keypoints_info))
     
@@ -529,7 +536,10 @@ if __name__ == "__main__":
         # run_demo(net, frame_provider, args.height_size, args.cpu, args.track, args.smooth) # video
         # Define the functions to run the demos
 
+    start_time = time.time()
+    print("Start processing...")
     if args.video == '0' or args.video == '1' or args.video == '2':
+        ### Real-time webcam detection
         run_demo(
             net,
             frame_provider,
@@ -540,6 +550,7 @@ if __name__ == "__main__":
             skeleton_list
         )
     else:
+        ### Video detection
         run_demo(
             net,
             frame_provider,
@@ -548,6 +559,9 @@ if __name__ == "__main__":
             args.track,
             args.smooth
         )
+        
+    total_time = time.time() - start_time
+    print(f"Total processing time: {total_time:.2f} seconds")
     
     # Add this line to prevent the OpenCV windows from closing automatically
     cv2.waitKey(0)
