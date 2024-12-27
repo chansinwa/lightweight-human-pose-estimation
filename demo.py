@@ -140,8 +140,8 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
 
     keypoints_info = []
     
+    fps_time = 0; #2024-12-27 added by sita
     frame_num = 0
-    start_time = time.time()  # Start time for calculating FPS
     
     for img in image_provider:
         orig_img = img.copy()
@@ -195,12 +195,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
                     x, y = keypoint
                     keypoints_info.append({"frame_id": frame_num, "kpt_id": kpt_id, "kpt_name": kpt_name, "coords": [x, y]})
 
-                # Print the new array of objects in the desired format
-                # for info in keypoints_info:
-                #     print(info)
-                
-                fps = round(frame_num / (time.time() - start_time), 2)  # Calculate FPS
-                #print(f"Frame: {frame_num}, FPS: {fps}")
+                fps = round((1.0 / (time.time() - fps_time)),2)
 
                 # Write the info on the img, Tommy, 02-11-2024
                 img = console_log(img, {
@@ -229,7 +224,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth):
         
         
         frame_num += 1
-
+        fps_time = time.time()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
