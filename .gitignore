@@ -1,3 +1,9 @@
+coco/
+*.pkl
+*.zip
+*.tar
+wandb/
+
 # Custom ignore
 *.pth
 detection/
