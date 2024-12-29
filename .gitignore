@@ -3,6 +3,7 @@
 detection/
 *.DS_Store
 *.pkl
+coco/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

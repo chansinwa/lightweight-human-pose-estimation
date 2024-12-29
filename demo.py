@@ -25,6 +25,7 @@ device = torch.device(
 
 ## Load the JSON data from the file
 skeleton_list = []
+tracking_report = {}
 with open('kpts_list.json', 'r') as file:
     skeleton_list = json.load(file)
     
@@ -240,18 +241,9 @@ def console_log(img, msg):
     padding = 5
     lineType = 2  # Thickness of the line
 
-    lines = [
-        "inputed file: " + str(msg["filename"]),
-        "frame: " + str(msg["frame_num"]),
-        "screen size: " + str(msg["screen_size"]),
-        "fps: " + str(msg["fps"]),
-        "cpu load: " + str(msg["cpu_load"]) + "%",
-    ]
-
     y = org[1]
-    for line in lines:
-        # (text_width, text_height), _ = cv2.getTextSize(line, font, fontScale, lineType)
-        # cv2.rectangle(img, (org[0], y - text_height + padding), (org[0] + text_width + 2 * padding, y + padding), backgroundColor, -1) # Draw text background
+    for key, value in msg.items():
+        line = f"{key}: {value}"
         cv2.putText(img, line, (org[0], y), font, fontScale, fontColor, lineType)
         y += 20  # Adjust this value to control the spacing between lines
 
@@ -259,7 +251,7 @@ def console_log(img, msg):
 
 
 
-def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list=None):      
+def run_demo(export_path, filename, net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list=None):      
     net = net.eval()
     # if not cpu:
     #     net = net.cuda()
@@ -272,33 +264,29 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
     num_keypoints = Pose.num_kpts
     previous_poses = []
     delay = 1
+    
+    frame_report = []
+    keypoints_report = []
+    frame_id = 0
+    # current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+    # try:
+    #     filename = os.path.basename(image_provider.file_name)
+    # except:
+    #     filename = "webcam"
+    # export_path = f"detection/exports/{filename}_{current_datetime}/"
 
-    # code for saving files, Tommy, 02-11-2024
-    frame_num = 0
-    current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-    try:
-        filename = os.path.basename(image_provider.file_name)
-    except:
-        filename = "webcam"
-    export_path = f"detection/exports/{filename}_{current_datetime}/"
+    # if not os.path.exists(f"{export_path}"):
+    #     os.makedirs(f"{export_path}")
+    # else:
+    #     shutil.rmtree(f"{export_path}/")
+    #     os.makedirs(f"{export_path}/")
 
-    if not os.path.exists(f"{export_path}"):
-        os.makedirs(f"{export_path}")
-    else:
-        shutil.rmtree(f"{export_path}/")
-        os.makedirs(f"{export_path}/")
+    # print("imported file:", filename)
 
-    print("imported file:", filename)
-    # code for saving files
-
-    # Initialize FPS calculation variables
-    start_time = time.time()
-    frame_count = 0
-    # fps = 0
-
-    keypoints_info = []
+    
 
     for img in image_provider:
+        keypoints_info = []
         orig_img = img.copy()
         heatmaps, pafs, scale, pad = infer_fast(
             net, img, height_size, stride, upsample_ratio, cpu
@@ -345,7 +333,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
 
         for pose in current_poses:
             # draw the checkpoints and lines on the img
-            pose.draw(img, frame_num)
+            pose.draw(img, frame_id)
 
         # Create a transparent image with the same dimensions as the original
         skeleton_img = np.zeros(
@@ -360,7 +348,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
                 pose.draw_skeleton(skeleton_img)
             else:
                 # webcam real-time detection
-                pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_num]) # pass the 18 skeleton keypoints of the current frame
+                pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_id]) # pass the 18 skeleton keypoints of the current frame
                 
                 ## Calculate RMS for each keypoint
                 # updated_keypoints_info = calculate_rms(ref_ckpt_list, keypoints_info)
@@ -370,9 +358,9 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
                 #     rms_values = {keypoint['kpt_id']: {'rms': keypoint['rms'], 'coords': keypoint['coords']} for keypoint in updated_keypoints_info}
 
                 #     ## Draw the skeleton and RMS values
-                #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_num], rms_values)  # Pass RMS values to draw_skeleton
+                #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_id], rms_values)  # Pass RMS values to draw_skeleton
                 # else:
-                #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_num])
+                #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_id])
             
         # Combine the tracked image and the raw image on video tracking
         img = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
@@ -394,51 +382,65 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
                     (0, 0, 255),
                 )
 
-                # print("pose.keypoints:", pose.keypoints)
-                # Create a new array of objects with the desired format, for printing the keypoints data
-                # making the keypoint_list
                 for i, keypoint in enumerate(pose.keypoints):
                     kpt_id = i
                     kpt_name = Pose.kpt_names[i]
                     x, y = keypoint
+                    
+                    normalized_x = x / img.shape[1]
+                    normalized_y = y / img.shape[0]
+                    
                     keypoints_info.append(
                         {
-                            "frame_id": frame_num,
+                            "frame_id": frame_id,
                             "kpt_id": kpt_id,
                             "kpt_name": kpt_name,
-                            "coords": [x, y],
+                            "coords": [x.tolist(), y.tolist()],
+                            "normalized_coords": [normalized_x, normalized_y]
                         }
-                    )
-
-                ## Print the new array of objects in the desired format
-                # for info in keypoints_info:
-                #     print(info)
-
-                ## Create a DataFrame from the keypoints_info list
-                # df = pd.DataFrame(keypoints_info)
-                # # Export the DataFrame to an Excel file
-                # df.to_excel(export_path + "keypoints_info.xlsx", index=False)
-
-                frame_count += 1
-
-                ## Calculate the fps
-                fps = round(1.0 / (time.time() - fps_time), 2)
+                    )   
+        # print("keypoints_info: ", keypoints_info)  
+        keypoints_report.append(keypoints_info)   
                 
-                ## Access the CPU usage
-                cpu_load = psutil.cpu_percent()
+        ## Calculate the fps
+        current_time = time.time()
+        fps = round(1.0 / (current_time - fps_time), 2)
+        
+        ## Access the CPU usage
+        cpu_load = psutil.cpu_percent()
                 
-                # Write the info on the img, Tommy, 02-11-2024
-                console_log(img, {"filename": filename, "frame_num": frame_num, "screen_size": img.shape[:2], "fps": fps, "cpu_load": cpu_load})
-                # Save the image, Tommy, 02-11-2024
-                image_name = "frame_" + str(frame_num) + ".jpg"
-                
-                ## this two lines are for saving images
-                cv2.imwrite(export_path + image_name, img)
-                # cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
+        ## Write the info on the img, Tommy, 02-11-2024
+        console_log(img, {"filename": filename, "frame_id": frame_id, "screen_size": img.shape[:2], "frame_time": current_time, "fps": fps, "cpu_load": cpu_load})
+        
+        ## Make the frame report
+        frame_report.append({
+            "filename": filename,
+            "frame_id": frame_id,
+            "frame_time": current_time,
+            "fps": fps,
+            "cpu_load": cpu_load,
+            "kpts": keypoints_info
+        })
+        
+        
+        # Save the image, Tommy, 02-11-2024
+        image_name = "frame_" + str(frame_id) + ".jpg"
+        
+        ## this two lines are for saving images
+        cv2.imwrite(export_path + image_name, img)
+        # cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
+        
+        
+            
+        """
+        ## Resize the skeleton image to match the dimensions of the original image
+        # skeleton_img_resized = cv2.resize(skeleton_img, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_AREA)
 
-        # cv2.imshow("Lightweight Human Pose Estimation Python Demo", img)
-        # cv2.imshow("Skeleton", skeleton_img)
- 
+        ## Blend the original image and the skeleton image
+        # final_img = cv2.addWeighted(img, 0.8, skeleton_img_resized, 0.2, 0)
+        # cv2.imshow(final_img)
+        """
+        
         ## Show the tracked image and skeleton image side by side
         if ref_ckpt_list is None: 
             ## video detection
@@ -460,15 +462,7 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
             # this is for saving the text file of the checkpoint list
             with open(f"{export_path}_combined_kpts.json", "w") as file:
                 file.write(str(combined_keypoints))
-            
-        
-        ## Resize the skeleton image to match the dimensions of the original image
-        # skeleton_img_resized = cv2.resize(skeleton_img, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_AREA)
-
-        ## Blend the original image and the skeleton image
-        # final_img = cv2.addWeighted(img, 0.8, skeleton_img_resized, 0.2, 0)
-        # cv2.imshow(final_img)
-
+                
         key = cv2.waitKey(delay)
         if key == 27:  # esc
             return
@@ -478,18 +472,11 @@ def run_demo(net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list
             else:
                 delay = 1
 
-        frame_num += 1
+        frame_id += 1
         fps_time = time.time()
-        
-
-    # print the whole keypoints_info list
-    # print("kpts_list:", keypoints_info)
     
-    ## this is for saving the text file of the checkpoint list
-    with open(f"{export_path}_kpts.txt", "w") as file:
-        file.write(str(keypoints_info))
+    return keypoints_report, frame_report
     
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -533,14 +520,31 @@ if __name__ == "__main__":
     else:
         args.track = 0
 
-        # run_demo(net, frame_provider, args.height_size, args.cpu, args.track, args.smooth) # video
-        # Define the functions to run the demos
+    ## create the export folder
+    current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+    try:
+        filename = os.path.basename(frame_provider.file_name)
+    except:
+        filename = "webcam"
+    export_path = f"detection/exports/{filename}_{current_datetime}/"
+
+    if not os.path.exists(f"{export_path}"):
+        os.makedirs(f"{export_path}")
+    else:
+        shutil.rmtree(f"{export_path}/")
+        os.makedirs(f"{export_path}/")
+
+    print("imported file:", filename)
+    
 
     start_time = time.time()
     print("Start processing...")
+    result = None
     if args.video == '0' or args.video == '1' or args.video == '2':
         ### Real-time webcam detection
-        run_demo(
+        result = run_demo(
+            export_path,
+            filename,
             net,
             frame_provider,
             args.height_size,
@@ -551,7 +555,9 @@ if __name__ == "__main__":
         )
     else:
         ### Video detection
-        run_demo(
+        result = run_demo(
+            export_path,
+            filename,
             net,
             frame_provider,
             args.height_size,
@@ -562,6 +568,32 @@ if __name__ == "__main__":
         
     total_time = time.time() - start_time
     print(f"Total processing time: {total_time:.2f} seconds")
+    
+    ## Handle the reports
+    keypoints_report, frame_report = result
+    
+    avg_fps = sum([frame['fps'] for frame in frame_report]) / len(frame_report)
+    avg_cpu_load = sum([frame['cpu_load'] for frame in frame_report]) / len(frame_report)
+    
+    tracking_report = {
+        "datetime": current_datetime,
+        "filename": filename,
+        "total_time": total_time,
+        "avg_fps": avg_fps,
+        "avg_cpu_load": avg_cpu_load,
+    }
+    
+    ## export JSON files
+    with open(f"{export_path}kpts_report.json", "w") as file:
+        json.dump(keypoints_report, file, indent=4)
+        
+    with open(f"{export_path}frame_report.json", "w") as file:
+        json.dump(frame_report, file, indent=4)
+    
+    with open(f"{export_path}tracking_report.json", "w") as file:
+        json.dump(tracking_report, file, indent=4)
+        
+    
     
     # Add this line to prevent the OpenCV windows from closing automatically
     cv2.waitKey(0)
