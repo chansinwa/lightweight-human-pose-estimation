@@ -25,6 +25,15 @@ class Pose:
     # Customer colors BGR
     kpts_colors = [255, 0, 0]
     
+    #added by Sita 07/11/2024
+    #BODY_PARTS dictionary to map the keypoints to the corresponding index with a readability
+    BODY_PARTS = {
+        "Nose": 0, "Neck": 1, "RShoulder": 2, "RElbow": 3, "RWrist": 4,
+        "LShoulder": 5, "LElbow": 6, "LWrist": 7, "RHip": 8, "RKnee": 9,
+        "RAnkle": 10, "LHip": 11, "LKnee": 12, "LAnkle": 13, "REye": 14,
+        "LEye": 15, "REar": 16, "LEar": 17, "Background": 18
+    }
+    
 
     def __init__(self, keypoints, confidence):
         super().__init__()
@@ -153,6 +162,105 @@ class Pose:
         
         # print("updated kpts_list: ", kpts_list) 
         return kpts_list
+
+    def is_valid_point(self, point):
+        #Check if the point is valid (not None and has valid coordinates).
+        return point is not None and all(coord != -1 for coord in point)
+    def calculate_angle(self, a, b, c):
+        if a is None or b is None or c is None:
+            return None
+        
+        a = np.array(a)
+        b = np.array(b)
+        c = np.array(c)
+
+        a_length = np.linalg.norm(b-c)
+        b_length = np.linalg.norm(a-c)
+        c_length = np.linalg.norm(a-b)
+        #use law of cosines to find angle C
+        #cos(B) = (a^2 + c^2 - b^2) / 2ac
+        angle = np.arccos((a_length**2 + c_length**2 - b_length**2) / (2 * a_length * c_length))
+        return np.degrees(angle) #convert to degrees
+
+    def calculate_distance(self, point1, point2):
+        # Calculate the Euclidean distance between two points
+        return np.linalg.norm(np.array(point1) - np.array(point2))
+    
+    def draw_text_with_outline(self, img, text, position, font_scale, thickness):
+        # Draw text with an outline effect.
+        # Draw the black outline (border)
+        cv2.putText(img, text, (position[0]-1, position[1]-1), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness + 1)
+        cv2.putText(img, text, (position[0]+1, position[1]-1), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness + 1)
+        cv2.putText(img, text, (position[0]-1, position[1]+1), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness + 1)
+        cv2.putText(img, text, (position[0]+1, position[1]+1), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness + 1)
+        # Draw the red text on top
+        cv2.putText(img, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), thickness)
+        
+    def draw_angle_sector(self, img, center, line1, line2, radius=50):
+        # Draw a circular sector to represent the angle visually.
+        # angle = self.calculate_angle(line1, center, line2)
+        start_angle = np.degrees(np.arctan2(line1[1] - center[1], line1[0] - center[0]))
+        end_angle = np.degrees(np.arctan2(line2[1] - center[1], line2[0] - center[0]))
+        # end_angle = start_angle + angle
+        
+        # # Ensure the angles are in the correct order
+        if end_angle < start_angle:
+            end_angle += 360
+        #     print("end_angle", end_angle, "start_angle", start_angle)
+            
+        #     if ((end_angle % 360) - (start_angle % 360))  > 180:
+        #         start_angle, end_angle = end_angle, start_angle  # Swap the angles
+                
+        # start_angle = start_angle % 360
+        # end_angle = end_angle % 360
+        # Draw the arc
+        cv2.ellipse(img, center, (radius, radius), 0, start_angle, end_angle, (255, 0, 0), 2)
+
+
+    def draw_angles(self, img):
+        # Get keypoints coordinates
+        RShoulder = self.keypoints[self.BODY_PARTS["RShoulder"]]
+        RElbow = self.keypoints[self.BODY_PARTS["RElbow"]]
+        RWrist = self.keypoints[self.BODY_PARTS["RWrist"]]
+
+        LShoulder = self.keypoints[self.BODY_PARTS["LShoulder"]]
+        LElbow = self.keypoints[self.BODY_PARTS["LElbow"]]
+        LWrist = self.keypoints[self.BODY_PARTS["LWrist"]]
+
+        # Calculate angles
+        r_arm_angle = self.calculate_angle(RShoulder, RElbow, RWrist)
+        l_arm_angle = self.calculate_angle(LShoulder, LElbow, LWrist)
+
+        # Calculate distance for dynamic angle value text size
+        distance_r_arm = self.calculate_distance(RElbow, RWrist)
+        font_scale_r = min(max(distance_r_arm / 100, 0.5), 1.5)
+        distance_l_arm = self.calculate_distance(LElbow, LWrist)
+        font_scale_l = min(max(distance_l_arm / 100, 0.5), 1.5)
+
+        # Right Arm
+        if self.is_valid_point(RShoulder) and self.is_valid_point(RElbow) and self.is_valid_point(RWrist):
+            cv2.line(img, tuple(RShoulder), tuple(RElbow), (0, 255, 0), 3)  
+            cv2.line(img, tuple(RElbow), tuple(RWrist), (0, 255, 0), 3)  
+            cv2.ellipse(img, tuple(RShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            cv2.ellipse(img, tuple(RElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            cv2.ellipse(img, tuple(RWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            if r_arm_angle is not None:
+                # cv2.putText(img, f"{r_arm_angle:.2f}", tuple(RElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_r, (0, 0, 0), 2)
+                self.draw_text_with_outline(img, f"{r_arm_angle:.1f}", tuple(RElbow), font_scale_r, 2)
+                # self.draw_angle_sector(img, tuple(RElbow), RShoulder, RWrist) 
+                
+
+        # Left Arm
+        if self.is_valid_point(LShoulder) and self.is_valid_point(LElbow) and self.is_valid_point(LWrist):
+            cv2.line(img, tuple(LShoulder), tuple(LElbow), (0, 255, 0), 3)
+            cv2.line(img, tuple(LElbow), tuple(LWrist), (0, 255, 0), 3)  
+            cv2.ellipse(img, tuple(LShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            cv2.ellipse(img, tuple(LElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            cv2.ellipse(img, tuple(LWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            if l_arm_angle is not None:
+                # cv2.putText(img, f"{l_arm_angle:.2f}", tuple(LElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_l, (0, 0, 0), 2)
+                self.draw_text_with_outline(img, f"{l_arm_angle:.1f}", tuple(LElbow), font_scale_l, 2)
+                # self.draw_angle_sector(img, tuple(LElbow), LShoulder, LWrist) 
 
 def get_similarity(a, b, threshold=0.5):
     num_similar_kpt = 0

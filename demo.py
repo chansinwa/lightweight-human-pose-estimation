@@ -385,6 +385,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
         for pose in current_poses:
             # draw the checkpoints and lines on the img
             pose.draw(img, frame_id)
+            pose.draw_angles(img)
 
         # Create a transparent image with the same dimensions as the original
         skeleton_img = np.zeros(
@@ -421,9 +422,10 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             
         # Combine the tracked image and the raw image on video tracking
         
-        img = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
+        img = cv2.addWeighted(orig_img, 0.2, img, 0.8, 0)
 
         for pose in current_poses:
+            
             cv2.rectangle(
                 img,
                 (pose.bbox[0], pose.bbox[1]),
