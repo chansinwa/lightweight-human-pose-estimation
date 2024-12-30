@@ -72,12 +72,6 @@ class Pose:
             if global_kpt_a_id != -1 and global_kpt_b_id != -1:
                 cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.color, 5)
             
-        
-        ## Draw the four corners of the screen
-        cv2.circle(img, (0, 0), 20, (255, 0, 0), -1)
-        cv2.circle(img, (0, img.shape[0]), 20, (0, 255, 0), -1)
-        cv2.circle(img, (img.shape[1], 0), 20, (255, 0, 0), -1)
-        cv2.circle(img, (img.shape[1], img.shape[0]), 20, (0, 255, 0), -1)
                  
     def draw_skeleton(self, img, kpts_list = None, rms_values=None):
         grey_value = 10  # Adjust this value to change the grey tone
@@ -102,92 +96,63 @@ class Pose:
                     cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 50)
             
         else:
-            # webcam real-time detection (draw the skeleton on the center of camera view)
-            kpt_coords = {kpt['kpt_id']: tuple(kpt['coords']) for kpt in kpts_list}
+            ### webcam real-time detection (draw the skeleton on the center of camera view)
+            ## Extract the 18 normalized coordinates from the imported list and create this object: {0: (normalized_x, normalized_y), ...}
+            if len(kpts_list) > 0:
+                # normalized_kpt_list = {kpt['kpt_id']: tuple(kpt['normalized_coords']) for kpt in kpts_list[0]['kpts']}
+                scaled_kpt = {}
+                
+                for kpt in kpts_list[0]['kpts']:
+                    if 'normalized_coords' in kpt:
+                        kpt_id = kpt['kpt_id']
+                        x, y = kpt['normalized_coords']
+                        ## fit the normalized coordinates to real-time size (1920x1080)
+                        x *= img.shape[1]
+                        y *= img.shape[0]
+                        scaled_kpt[kpt_id] = [x, y]
+                        kpt['ref_scaled_coords'] = scaled_kpt[kpt_id]
                         
-            # print("webcam kpts_list: ", kpts_list)
-            
-            """
-            scaling_factor = 1.35  # Adjust this value to increase or decrease the size
-            for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
-                kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
-                if kpt_a_id in kpt_coords:
-                    x_a, y_a = kpt_coords[kpt_a_id]
-                    x_a *= scaling_factor
-                    y_a *= scaling_factor
-                kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
-                if kpt_b_id in kpt_coords:
-                    x_b, y_b = kpt_coords[kpt_b_id]
-                    x_b *= scaling_factor
-                    y_b *= scaling_factor
-                if kpt_a_id in kpt_coords and kpt_b_id in kpt_coords:
-                    cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)  
-            """
-            
-            ### Normalize Coordinates
-            # Scaling and positioning the skeleton in the real-time webcam view
-            scaling_factor = 1.35  # Adjust this value to increase or decrease the size
-            scaled_keypoints = {}  # Dictionary to store scaled keypoints
-            normalized_kpt_list = []
+                        # Change the key name from 'coords' to 'ref_coords'
+                        kpt['ref_coords'] = kpt.pop('coords')
+                        kpt['ref_normalized_coords'] = kpt.pop('normalized_coords')
+                        
+                        # print("updated kpt", kpt)
+                        
+                        # cv2.circle(img, (int(x), int(y)), 15, skeleton_color, -1)
+                        for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
+                            kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
+                            x_a, y_a = scaled_kpt.get(kpt_a_id, (0, 0))
 
-            for kpt_id, (x, y) in kpt_coords.items():
-                scaled_keypoints[kpt_id] = (x * scaling_factor, y * scaling_factor)
-                
-                """
-                ## Draw RMS value if available
-                if rms_values is not None and kpt_id in rms_values and rms_values[kpt_id]['rms'] is not None:
-                    rms_text = "RMS: {:.2f}".format(rms_values[kpt_id]['rms'])  # Format RMS value
-                    coords_x, coords_y = rms_values[kpt_id]['coords']
-                    cv2.putText(img, rms_text, (int(coords_x), int(coords_y) - 10),  # Position the text above the keypoint
-                                cv2.FONT_HERSHEY_SIMPLEX, 
-                                0.5, 
-                                (0, 0, 255),  # Color (red in BGR)
-                                1, 
-                                cv2.LINE_AA)
-                elif rms_values is not None and kpt_id in rms_values:
-                    # Optionally, display "N/A" if RMS is not available
-                    coords_x, coords_y = rms_values[kpt_id]['coords']
-                    cv2.putText(img, "RMS: N/A", (int(coords_x), int(coords_y) - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 
-                                0.5, 
-                                (0, 255, 0),  # Color (red in BGR)
-                                1, 
-                                cv2.LINE_AA)
-                """
+                            kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
+                            x_b, y_b = scaled_kpt.get(kpt_b_id, (0, 0))
 
-            # Calculate the centroid of the scaled body shape
-            if scaled_keypoints:
-                centroid_x = sum(x for x, y in scaled_keypoints.values()) / len(scaled_keypoints)
-                centroid_y = sum(y for x, y in scaled_keypoints.values()) / len(scaled_keypoints)
+                            if kpt_a_id in scaled_kpt and kpt_b_id in scaled_kpt:
+                                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)
+                    
+                """
+                # for kpt_id, (x, y) in normalized_kpt_list.items():
+                #     ## fit the normalized coordinates to real-time size (1920x1080)
+                #     x *= img.shape[1]
+                #     y *= img.shape[0]
+                #     scaled_kpt[kpt_id] = (x, y)
+                #     kpts_list[0]['kpts']['scaled_coords'] = scaled_kpt[kpt_id]
+                    
+                #     # cv2.circle(img, (int(x), int(y)), 15, skeleton_color, -1)
+                #     for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
+                #         kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
+                #         x_a, y_a = scaled_kpt.get(kpt_a_id, (0, 0))
+
+                #         kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
+                #         x_b, y_b = scaled_kpt.get(kpt_b_id, (0, 0))
+
+                #         if kpt_a_id in scaled_kpt and kpt_b_id in scaled_kpt:
+                #             cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)
+                """
             else:
-                # Handle the case where scaled_keypoints is empty
-                centroid_x = 0  # Set a default value or handle it accordingly
-                centroid_y = 0
                 return
-
-            # Calculate the translation needed to move the centroid to the center of the OpenCV window
-            window_center_x = img.shape[1] // 2
-            window_center_y = img.shape[0] // 2
-            window_bottom_y = img.shape[0] - 100 # Adjust the bottom vertical position (like a floor)
-            translation_x = window_center_x - centroid_x
-            translation_y = window_bottom_y - max(y for _, y in scaled_keypoints.values())
-
-            # Update the coordinates based on the translation
-            for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
-                kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
-                x_a, y_a = scaled_keypoints.get(kpt_a_id, (0, 0))
-                x_a += translation_x
-                y_a += translation_y
-
-                kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
-                x_b, y_b = scaled_keypoints.get(kpt_b_id, (0, 0))
-                x_b += translation_x
-                y_b += translation_y
-
-                if kpt_a_id in scaled_keypoints and kpt_b_id in scaled_keypoints:
-                    cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)
-                
-
+        
+        # print("updated kpts_list: ", kpts_list) 
+        return kpts_list
 
 def get_similarity(a, b, threshold=0.5):
     num_similar_kpt = 0
