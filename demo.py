@@ -373,9 +373,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                     )
             pose = Pose(pose_keypoints, pose_entries[n][18])
             current_poses.append(pose)
-            # list of keypoints data
-            # print("pose:", pose_keypoints)
-
+            
         # print(current_poses)
 
         if track:
@@ -386,6 +384,8 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             # draw the checkpoints and lines on the img
             pose.draw(img, frame_id)
             pose.draw_angles(img)
+            
+        
 
         # Create a transparent image with the same dimensions as the original
         skeleton_img = np.zeros(
@@ -393,39 +393,11 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
         )  # Add an alpha channel
         skeleton_img[:, :, :3] = [255, 255, 255]  # Set RGB values to white color
         skeleton_img[:, :, 3] = 0  # Set alpha channel to 0 for full transparency
-
-        for pose in current_poses:
-            if ref_ckpt_list is None:
-                ### video detection
-                pose.draw_skeleton(skeleton_img)
-            else:
-                ### webcam real-time detection
-                ## pass the 18 skeleton keypoints of the current frame
-                combined_kpts = pose.draw_skeleton(img, [kpts for kpts in ref_ckpt_list if kpts.get('frame_id') == frame_id]) 
-                
-                
-                if combined_kpts is not None and len(combined_kpts) > 0:
-                    webcam_frame_report.append(combined_kpts[0])
-                
-                
-                ## Calculate RMS for each keypoint
-                # updated_keypoints_info = calculate_rms(ref_ckpt_list, keypoints_info)
-                # if updated_keypoints_info:
-                #     # Create a dictionary for RMS values keyed by kpt_id
-                #     # rms_values = {keypoint['kpt_id']: keypoint['rms'] for keypoint in updated_keypoints_info}
-                #     rms_values = {keypoint['kpt_id']: {'rms': keypoint['rms'], 'coords': keypoint['coords']} for keypoint in updated_keypoints_info}
-
-                #     ## Draw the skeleton and RMS values
-                #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_id], rms_values)  # Pass RMS values to draw_skeleton
-                # else:
-                #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_id])
-            
-        # Combine the tracked image and the raw image on video tracking
         
-        img = cv2.addWeighted(orig_img, 0.2, img, 0.8, 0)
+         
+        # Combine the tracked image and the raw image on video tracking
 
         for pose in current_poses:
-            
             cv2.rectangle(
                 img,
                 (pose.bbox[0], pose.bbox[1]),
@@ -458,9 +430,36 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                             "coords": [x.tolist(), y.tolist()],
                             "normalized_coords": [normalized_x, normalized_y]
                         }
-                    )   
+                    )  
+                    
         # print("keypoints_info: ", keypoints_info)  
         keypoints_report.append(keypoints_info)   
+        
+        for pose in current_poses:
+            if ref_ckpt_list is None:
+                ### video detection
+                pose.draw_skeleton(skeleton_img)
+            else:
+                ### webcam real-time detection
+                ## pass the 18 skeleton keypoints of the current frame
+                combined_kpts = pose.draw_skeleton(img, [kpts for kpts in ref_ckpt_list if kpts.get('frame_id') == frame_id]) 
+                
+                
+                if combined_kpts is not None and len(combined_kpts) > 0:
+                    webcam_frame_report.append(combined_kpts[0])
+                
+                
+                ## Calculate RMS for each keypoint
+                # updated_keypoints_info = calculate_rms(ref_ckpt_list, keypoints_info)
+                # if updated_keypoints_info:
+                #     # Create a dictionary for RMS values keyed by kpt_id
+                #     # rms_values = {keypoint['kpt_id']: keypoint['rms'] for keypoint in updated_keypoints_info}
+                #     rms_values = {keypoint['kpt_id']: {'rms': keypoint['rms'], 'coords': keypoint['coords']} for keypoint in updated_keypoints_info}
+
+                #     ## Draw the skeleton and RMS values
+                #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_id], rms_values)  # Pass RMS values to draw_skeleton
+                # else:
+                #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_id])
                 
         ## Calculate the fps
         current_time = time.time()
@@ -491,16 +490,6 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
         # cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
         
         
-            
-        """
-        ## Resize the skeleton image to match the dimensions of the original image
-        # skeleton_img_resized = cv2.resize(skeleton_img, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_AREA)
-
-        ## Blend the original image and the skeleton image
-        # final_img = cv2.addWeighted(img, 0.8, skeleton_img_resized, 0.2, 0)
-        # cv2.imshow(final_img)
-        """
-        
         ## Show the tracked image and skeleton image side by side
         if ref_ckpt_list is None: 
             ## video detection
@@ -513,8 +502,8 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             ## calculate rms between the two checkpoints lists
             # kpt_info = calculate_rms(ref_ckpt_list, keypoints_info)
             # print("RMS Distance:", rms_value)
-                
-            cv2.imshow("Realtime webcam", img)
+            img_with_skeleton = cv2.addWeighted(orig_img, 0.5, img, 0.5, 0)
+            cv2.imshow("Realtime webcam", img_with_skeleton) # img
             
             ## Make the new list with both keypoints_info, ref_ckpt_list, and the RMS value
             # combined_keypoints = combine_keypoints_with_rms(ref_ckpt_list, keypoints_info)

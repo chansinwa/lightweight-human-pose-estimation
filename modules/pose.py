@@ -84,8 +84,10 @@ class Pose:
                  
     def draw_skeleton(self, img, kpts_list = None, rms_values=None):
         grey_value = 10  # Adjust this value to change the grey tone
-        skeleton_color = (grey_value, grey_value, grey_value)  # BGR format for grey line color
-        skeleton_color = tuple(list(skeleton_color[:3]) + [int(255 * 0.9)]) # Add transparency to the grey line color
+        skeleton_color = (grey_value, grey_value, grey_value, int(255 * 0.9))  # BGRA format with alpha for transparency
+        
+        # skeleton_color = (grey_value, grey_value, grey_value)  # BGR format for grey line color
+        # skeleton_color = tuple(list(skeleton_color[:3]) + [int(255 * 0.9)]) # Add transparency to the grey line color
         assert self.keypoints.shape == (Pose.num_kpts, 2)
         
         if kpts_list is None:
@@ -136,8 +138,8 @@ class Pose:
                             x_b, y_b = scaled_kpt.get(kpt_b_id, (0, 0))
 
                             if kpt_a_id in scaled_kpt and kpt_b_id in scaled_kpt:
-                                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)
-                    
+                                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)  
+                
                 """
                 # for kpt_id, (x, y) in normalized_kpt_list.items():
                 #     ## fit the normalized coordinates to real-time size (1920x1080)
@@ -159,7 +161,6 @@ class Pose:
                 """
             else:
                 return
-        
         # print("updated kpts_list: ", kpts_list) 
         return kpts_list
 
