@@ -9,6 +9,7 @@ import shutil
 import time
 import psutil
 import math
+import threading
 
 import threading
 import pandas as pd
@@ -24,62 +25,14 @@ device = torch.device(
     "mps" if torch.backends.mps.is_available() else "cpu"
 )  ## additional import for device configuration
 
-## Load the JSON data from the file
 skeleton_list = []
-tracking_report = {}
-combined_frame_report = []
+summary_report = {}
+matching_kpts_report = []
 
-
+## Load the JSON data from the file
 with open('frame_report.json', 'r') as file:
     skeleton_list = json.load(file)
-    
-def calculate_rms(checkpoints, real_time_keypoints):
-    ## Create a dictionary for quick lookup of real-time keypoints by (frame_id, kpt_id)
-    real_time_dict = {
-        (kp['frame_id'], kp['kpt_id']): kp['coords']
-        for kp in real_time_keypoints
-    }
-    
-    updated_realtime_kpts = []
 
-    ## List to store distances for RMS calculation
-    distances = []
-
-    ## Iterate through each checkpoint
-    for checkpoint in checkpoints:
-        frame_id = checkpoint['frame_id']
-        kpt_id = checkpoint['kpt_id']
-        checkpoint_coords = checkpoint['coords']
-        
-        ## Create a base object for the current keypoint
-        keypoint_info = {
-            "frame_id": frame_id,
-            "kpt_id": kpt_id,
-            "kpt_name": checkpoint.get('kpt_name', ''),  ## Include kpt_name if available
-            "coords": checkpoint_coords,
-        }
-
-        ## Check if the corresponding real-time keypoint exists
-        if (frame_id, kpt_id) in real_time_dict:
-            real_time_coords = real_time_dict[(frame_id, kpt_id)]
-            
-            ## Calculate Euclidean distance
-            distance = np.linalg.norm(np.array(checkpoint_coords) - np.array(real_time_coords))
-            distances.append(distance)
-            
-            keypoint_info["rms"] = distance  ## Store the distance as RMS for this keypoint
-        else:
-            keypoint_info["rms"] = None  ## No corresponding real-time keypoint found
-        
-        updated_realtime_kpts.append(keypoint_info)
-
-    ## Calculate RMS if there are distances to compute
-    if distances:
-        rms = np.sqrt(np.mean(np.square(distances)))
-        return updated_realtime_kpts
-    else:
-        return None  ## No matching keypoints found
-    
 def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
     """
     Calculate the Object Keypoint Similarity (OKS) between predicted and ground truth keypoints.
@@ -100,95 +53,16 @@ def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
     oks = np.sum(np.exp(-distances ** 2 / (2 * (keypoint_variance ** 2)))) / K
     return oks
 
-def calculate_abs_distance(coords, ref_scaled_coords):
-    # Calculate the straight (Euclidean) distance between two points
-    distance = math.sqrt((ref_scaled_coords[0] - coords[0]) ** 2 + (ref_scaled_coords[1] - coords[1]) ** 2)
-    return distance
-
-def calculate_rms_distance(coords, ref_scaled_coords):
-    # Calculate the RMS distance between two points
-    squared_diff = [(coords[i] - ref_scaled_coords[i]) ** 2 for i in range(2)]
-    rms = math.sqrt(sum(squared_diff) / len(squared_diff))
-    return rms
-
-def combine_frame_report(frame_report, webcam_frame_report):
-    # Create a dictionary from the second array
-    ref_kpts_dict = {}
-    for frame in webcam_frame_report:
-        for kpt in frame['kpts']:
-            key = (kpt['frame_id'], kpt['kpt_id'])
-            ref_kpts_dict[key] = kpt
+# Function to calculate statistics of abs_distance
+def calculate_distance_statistics(data):
+    abs_distances = [item['abs_distance'] for sublist in data for item in sublist]
+    max_distance = np.max(abs_distances)
+    min_distance = np.min(abs_distances)
+    mean_distance = np.mean(abs_distances)
+    median_distance = np.median(abs_distances)
+    std_distance = np.std(abs_distances)
     
-    # Combine the kpts
-    for frame in frame_report:
-        for kpt in frame['kpts']:
-            key = (kpt['frame_id'], kpt['kpt_id'])
-            if key in ref_kpts_dict:
-                ref_kpt = ref_kpts_dict[key]
-                
-                abs_distance = calculate_abs_distance(kpt['coords'], ref_kpt['ref_scaled_coords'])
-                rms_distance = calculate_rms_distance(kpt['coords'], ref_kpt['ref_scaled_coords'])
-                
-                combined_kpt = {
-                    "frame_id": kpt['frame_id'],
-                    "kpt_id": kpt['kpt_id'],
-                    "kpt_name": kpt['kpt_name'],
-                    "coords": kpt['coords'],
-                    "normalized_coords": kpt['normalized_coords'],
-                    "ref_scaled_coords": ref_kpt['ref_scaled_coords'],
-                    "ref_coords": ref_kpt['ref_coords'],
-                    "ref_normalized_coords": ref_kpt['ref_normalized_coords'],
-                    "abs_distance": abs_distance,
-                    "rms_distance": rms_distance
-                }
-                kpt.update(combined_kpt)  # Update kpt with combined data
-    
-    return frame_report
-    
-
-def combine_keypoints_with_rms(ref_ckpt_list, keypoints_info):
-    combined_list = []
-
-    ## Create a dictionary for quick lookup of reference keypoints by (frame_id, kpt_id)
-    ref_dict = {
-        (kp['frame_id'], kp['kpt_id']): kp['coords']
-        for kp in ref_ckpt_list
-    }
-
-    # Iterate through each real-time keypoint
-    for keypoint in keypoints_info:
-        frame_id = keypoint['frame_id']
-        kpt_id = keypoint['kpt_id']
-        real_time_coords = keypoint['coords']
-
-        # Check if the corresponding reference keypoint exists
-        if (frame_id, kpt_id) in ref_dict:
-            ref_coords = ref_dict[(frame_id, kpt_id)]
-            
-            # Calculate Euclidean distance
-            distance = np.linalg.norm(np.array(real_time_coords) - np.array(ref_coords))
-            # rms = distance  # Here, we are just using the distance; if you want RMS over multiple frames, you need to adjust accordingly
-            rms = np.sqrt(np.mean(np.square(distance)))
-            
-            # # Define the area (for example, a bounding box area)
-            # area = (max_x - min_x) * (max_y - min_y)  # Replace with actual bounding box calculation
-            # keypoint_variance = 0.5  # Example variance, adjust as needed
-            # # Calculate OKS
-            # oks_value = calculate_oks(real_time_coords, ref_coords, area, keypoint_variance)
-
-            # Create combined dictionary
-            combined_keypoint = {
-                "frame_id": frame_id,
-                "kpt_id": kpt_id,
-                "kpt_name": keypoint['kpt_name'],
-                "coords": real_time_coords,
-                "ref_kpt_coords": ref_coords,
-                "rms": rms
-            }
-            combined_list.append(combined_keypoint)
-
-    return combined_list
-
+    return max_distance, min_distance, mean_distance, median_distance, std_distance
 
 class ImageReader(object):
     def __init__(self, file_names):
@@ -301,7 +175,7 @@ def console_log(img, msg):
 
 
 
-def run_demo(export_path, filename, net, image_provider, height_size, cpu, track, smooth, ref_ckpt_list=None):      
+def run_demo(export_path, filename, net, image_provider, height_size, cpu, track, smooth, ref_kpts_list=None):      
     net = net.eval()
     # if not cpu:
     #     net = net.cuda()
@@ -315,29 +189,13 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
     previous_poses = []
     delay = 1
     
-    frame_report = []
+    tracking_frame_report = []
     keypoints_report = []
-    webcam_frame_report = []
     
     frame_id = 0
-    
-    # current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-    # try:
-    #     filename = os.path.basename(image_provider.file_name)
-    # except:
-    #     filename = "webcam"
-    # export_path = f"detection/exports/{filename}_{current_datetime}/"
-
-    # if not os.path.exists(f"{export_path}"):
-    #     os.makedirs(f"{export_path}")
-    # else:
-    #     shutil.rmtree(f"{export_path}/")
-    #     os.makedirs(f"{export_path}/")
-
-    # print("imported file:", filename)
 
     for img in image_provider:
-        keypoints_info = []
+        tracking_kpts_list = []
         orig_img = img.copy()
         heatmaps, pafs, scale, pad = infer_fast(
             net, img, height_size, stride, upsample_ratio, cpu
@@ -380,13 +238,6 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             track_poses(previous_poses, current_poses, smooth=smooth)
             previous_poses = current_poses
 
-        for pose in current_poses:
-            # draw the checkpoints and lines on the img
-            pose.draw(img, frame_id)
-            pose.draw_angles(img)
-            
-        
-
         # Create a transparent image with the same dimensions as the original
         skeleton_img = np.zeros(
             (img.shape[0], img.shape[1], 4), dtype=np.uint8
@@ -394,7 +245,6 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
         skeleton_img[:, :, :3] = [255, 255, 255]  # Set RGB values to white color
         skeleton_img[:, :, 3] = 0  # Set alpha channel to 0 for full transparency
         
-         
         # Combine the tracked image and the raw image on video tracking
 
         for pose in current_poses:
@@ -422,7 +272,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                     normalized_x = x / img.shape[1]
                     normalized_y = y / img.shape[0]
                     
-                    keypoints_info.append(
+                    tracking_kpts_list.append(
                         {
                             "frame_id": frame_id,
                             "kpt_id": kpt_id,
@@ -432,53 +282,45 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                         }
                     )  
                     
-        # print("keypoints_info: ", keypoints_info)  
-        keypoints_report.append(keypoints_info)   
+        # print("tracking_kpts_list: ", tracking_kpts_list)  
+        keypoints_report.append(tracking_kpts_list)   
         
         for pose in current_poses:
-            if ref_ckpt_list is None:
+            if ref_kpts_list is None:
                 ### video detection
                 pose.draw_skeleton(skeleton_img)
             else:
                 ### webcam real-time detection
-                ## pass the 18 skeleton keypoints of the current frame
-                combined_kpts = pose.draw_skeleton(img, [kpts for kpts in ref_ckpt_list if kpts.get('frame_id') == frame_id]) 
-                
+                ## pass the 18 ref skeleton keypoints and webcam tracking keypoints of the current frame
+                # print("ref_kpts_list:", [kpts['kpts'] for kpts in ref_kpts_list if kpts.get('frame_id') == frame_id], "\nwebcam_kpts_list:", tracking_kpts_list, "\n\n")
+                combined_kpts = pose.draw_skeleton(img, [kpts['kpts'] for kpts in ref_kpts_list if kpts.get('frame_id') == frame_id], [kpts for kpts in tracking_kpts_list if kpts.get('frame_id') == frame_id]) 
                 
                 if combined_kpts is not None and len(combined_kpts) > 0:
-                    webcam_frame_report.append(combined_kpts[0])
-                
-                
-                ## Calculate RMS for each keypoint
-                # updated_keypoints_info = calculate_rms(ref_ckpt_list, keypoints_info)
-                # if updated_keypoints_info:
-                #     # Create a dictionary for RMS values keyed by kpt_id
-                #     # rms_values = {keypoint['kpt_id']: keypoint['rms'] for keypoint in updated_keypoints_info}
-                #     rms_values = {keypoint['kpt_id']: {'rms': keypoint['rms'], 'coords': keypoint['coords']} for keypoint in updated_keypoints_info}
-
-                #     ## Draw the skeleton and RMS values
-                #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_id], rms_values)  # Pass RMS values to draw_skeleton
-                # else:
-                #     pose.draw_skeleton(img, [ckpt for ckpt in ref_ckpt_list if ckpt.get('frame_id') == frame_id])
-                
+                    matching_kpts_report.append(combined_kpts[0])
+           
+        for pose in current_poses:
+            # draw the checkpoints and lines on the img
+            pose.draw(img)
+            pose.draw_angles(img)
+             
         ## Calculate the fps
         current_time = time.time()
         fps = round(1.0 / (current_time - fps_time), 2)
         
         ## Access the CPU usage
-        cpu_load = psutil.cpu_percent()
+        current_cpu_load = psutil.cpu_percent()
                 
         ## Write the info on the img, Tommy, 02-11-2024
-        console_log(img, {"filename": filename, "frame_id": frame_id, "screen_size": img.shape[:2], "frame_time": current_time, "fps": fps, "cpu_load": cpu_load})
+        console_log(img, {"filename": filename, "frame_id": frame_id, "screen_size": img.shape[:2], "frame_time": current_time, "fps": fps, "cpu_load": current_cpu_load})
         
         ## Make the frame report
-        frame_report.append({
+        tracking_frame_report.append({
             "filename": filename,
             "frame_id": frame_id,
             "frame_time": current_time,
             "fps": fps,
-            "cpu_load": cpu_load,
-            "kpts": keypoints_info
+            "cpu_load": current_cpu_load,
+            "kpts": tracking_kpts_list
         })
         
         
@@ -491,30 +333,19 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
         
         
         ## Show the tracked image and skeleton image side by side
-        if ref_ckpt_list is None: 
+        if ref_kpts_list is None: 
             ## video detection
             img_with_alpha = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
             combined_img = np.hstack((img_with_alpha, skeleton_img))
             cv2.imshow("Original and Skeleton", combined_img)
         else: 
             ### webcam real-time detection
-            
-            ## calculate rms between the two checkpoints lists
-            # kpt_info = calculate_rms(ref_ckpt_list, keypoints_info)
-            # print("RMS Distance:", rms_value)
             img_with_skeleton = cv2.addWeighted(orig_img, 0.5, img, 0.5, 0)
             cv2.imshow("Realtime webcam", img_with_skeleton) # img
-            
-            ## Make the new list with both keypoints_info, ref_ckpt_list, and the RMS value
-            # combined_keypoints = combine_keypoints_with_rms(ref_ckpt_list, keypoints_info)
-            # # print("Combined Keypoints with RMS:", combined_keypoints)
-            # # this is for saving the text file of the checkpoint list
-            # with open(f"{export_path}_combined_kpts.json", "w") as file:
-            #     file.write(str(combined_keypoints))
                 
         key = cv2.waitKey(delay)
         if key == 27:  # esc
-            return keypoints_report, frame_report, webcam_frame_report
+            return keypoints_report, tracking_frame_report, matching_kpts_report
         elif key == 112:  # 'p'
             if delay == 1:
                 delay = 0
@@ -525,7 +356,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
         fps_time = time.time()
     
     
-    return keypoints_report, frame_report, webcam_frame_report
+    return keypoints_report, tracking_frame_report, matching_kpts_report
     
 
 if __name__ == "__main__":
@@ -621,37 +452,43 @@ if __name__ == "__main__":
     
     ## Handle the reports
     print("result length:", len(result))
-    keypoints_report, frame_report, webcam_frame_report = result
+    keypoints_report, tracking_frame_report, matching_kpts_report = result
     
-    avg_fps = sum([frame['fps'] for frame in frame_report]) / len(frame_report)
-    avg_cpu_load = sum([frame['cpu_load'] for frame in frame_report]) / len(frame_report)
+    avg_fps = sum([frame['fps'] for frame in tracking_frame_report]) / len(tracking_frame_report)
+    avg_cpu_load = sum([frame['cpu_load'] for frame in tracking_frame_report]) / len(tracking_frame_report)
     
-    tracking_report = {
+    if filename == 'webcam':
+        max_distance, min_distance, mean_distance, median_distance, std_distance = calculate_distance_statistics(matching_kpts_report)
+    
+    summary_report = {
         "datetime": current_datetime,
         "filename": filename,
         "total_time": total_time,
         "avg_fps": avg_fps,
         "avg_cpu_load": avg_cpu_load,
+        "max_distance": max_distance if filename == 'webcam' else None,
+        "min_distance": min_distance if filename == 'webcam' else None,
+        "mean_distance": mean_distance if filename == 'webcam' else None,
+        "median_distance": median_distance if filename == 'webcam' else None,
+        "std_distance": std_distance if filename == 'webcam' else None
     }
     
     ## export JSON files
-    with open(f"{export_path}kpts_report.json", "w") as file:
-        json.dump(keypoints_report, file, indent=4)
+    # with open(f"{export_path}kpts_report.json", "w") as file:
+    #     json.dump(keypoints_report, file, indent=4)
         
-    with open(f"{export_path}frame_report.json", "w") as file:
-        json.dump(frame_report, file, indent=4)
+    with open(f"{export_path}tracking_frame_report.json", "w") as file:
+        json.dump(tracking_frame_report, file, indent=4)
     
-    with open(f"{export_path}tracking_report.json", "w") as file:
-        json.dump(tracking_report, file, indent=4)
+    with open(f"{export_path}summary_report.json", "w") as file:
+        json.dump(summary_report, file, indent=4)
     
-    with open(f"{export_path}webcam_frame_report.json", "w") as file:
-        json.dump(webcam_frame_report, file, indent=4)
+    with open(f"{export_path}matching_kpts_report.json", "w") as file:
+        json.dump(matching_kpts_report, file, indent=4)
         
-    combined_frame_report = combine_frame_report(frame_report, webcam_frame_report)
-    with open(f"{export_path}combined_frame_report.json", 'w') as file:
-        json.dump(combined_frame_report, file, indent=4)
-        
-    
-    
+    # combined_frame_report = combine_frame_report(frame_report, webcam_frame_report)
+    # with open(f"{export_path}combined_frame_report.json", 'w') as file:
+    #     json.dump(combined_frame_report, file, indent=4)
+
     # Add this line to prevent the OpenCV windows from closing automatically
     cv2.waitKey(0)

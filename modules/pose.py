@@ -23,7 +23,10 @@ class Pose:
     color = [0, 224, 255]
     
     # Customer colors BGR
-    kpts_colors = [255, 0, 0]
+    kpts_colors = [0, 225, 255]
+    line_color = [255, 255, 0]
+    skeleton_overlay_color = [10, 10, 10]
+    skeleton_line_color = [255, 0, 255]
     
     #added by Sita 07/11/2024
     #BODY_PARTS dictionary to map the keypoints to the corresponding index with a readability
@@ -63,7 +66,7 @@ class Pose:
             self.id = Pose.last_id + 1
             Pose.last_id += 1
 
-    def draw(self, img, frame_id = None, kpts_list = None):
+    def draw(self, img):
         assert self.keypoints.shape == (Pose.num_kpts, 2)
 
         for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
@@ -78,42 +81,42 @@ class Pose:
             if global_kpt_b_id != -1:
                 x_b, y_b = self.keypoints[kpt_b_id]
                 cv2.circle(img, (int(x_b), int(y_b)), 6, Pose.kpts_colors, -1)
+                
             if global_kpt_a_id != -1 and global_kpt_b_id != -1:
-                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.color, 5)
+                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.line_color, 5)
             
-                 
-    def draw_skeleton(self, img, kpts_list = None, rms_values=None):
-        grey_value = 10  # Adjust this value to change the grey tone
-        skeleton_color = (grey_value, grey_value, grey_value, int(255 * 0.9))  # BGRA format with alpha for transparency
-        
-        # skeleton_color = (grey_value, grey_value, grey_value)  # BGR format for grey line color
-        # skeleton_color = tuple(list(skeleton_color[:3]) + [int(255 * 0.9)]) # Add transparency to the grey line color
+    
+    def draw_skeleton(self, img, ref_kpts_list = None, webcam_kpts_list=None):       
+        # grey_value = 10  # Adjust this value to change the grey tone
+        # skeleton_color = (grey_value, grey_value, grey_value, int(255 * 0.9))  # BGRA format with alpha for transparency
+
         assert self.keypoints.shape == (Pose.num_kpts, 2)
         
-        if kpts_list is None:
+        if ref_kpts_list is None:
             ### video detection (draw the skeleton on the right side of the window)
             for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
                 kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
                 global_kpt_a_id = self.keypoints[kpt_a_id, 0]
                 if global_kpt_a_id != -1:
                     x_a, y_a = self.keypoints[kpt_a_id]
-                    cv2.circle(img, (int(x_a), int(y_a)), 6, skeleton_color, -1)
+                    cv2.circle(img, (int(x_a), int(y_a)), 6, Pose.skeleton_overlay_color, -1)
                 kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
                 global_kpt_b_id = self.keypoints[kpt_b_id, 0]
                 if global_kpt_b_id != -1:
                     x_b, y_b = self.keypoints[kpt_b_id]
-                    cv2.circle(img, (int(x_b), int(y_b)), 6, skeleton_color, -1)
+                    cv2.circle(img, (int(x_b), int(y_b)), 6, Pose.skeleton_overlay_color, -1)
                 if global_kpt_a_id != -1 and global_kpt_b_id != -1:
-                    cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 50)
+                    cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.skeleton_overlay_color, 50)
             
         else:
             ### webcam real-time detection (draw the skeleton on the center of camera view)
             ## Extract the 18 normalized coordinates from the imported list and create this object: {0: (normalized_x, normalized_y), ...}
-            if len(kpts_list) > 0:
-                # normalized_kpt_list = {kpt['kpt_id']: tuple(kpt['normalized_coords']) for kpt in kpts_list[0]['kpts']}
+            if len(ref_kpts_list) > 0:
                 scaled_kpt = {}
+                circle_coordinates = []
+                circle_colors = []
                 
-                for kpt in kpts_list[0]['kpts']:
+                for kpt in ref_kpts_list[0]:
                     if 'normalized_coords' in kpt:
                         kpt_id = kpt['kpt_id']
                         x, y = kpt['normalized_coords']
@@ -127,9 +130,23 @@ class Pose:
                         kpt['ref_coords'] = kpt.pop('coords')
                         kpt['ref_normalized_coords'] = kpt.pop('normalized_coords')
                         
-                        # print("updated kpt", kpt)
+                        ## Calculate the abs distance between the keypoints
+                        abs_distance = 0
+                        if webcam_kpts_list is not None:
+                            webcam_kpt_corrds = webcam_kpts_list[kpt_id]['coords']
+                            abs_distance = self.calculate_distance(kpt['ref_scaled_coords'], webcam_kpt_corrds)
+                            # print("fram_id", kpt['frame_id'], "kpt_id: ", kpt_id, "ref_scaled_coords: ", kpt['ref_scaled_coords'], "webcam_kpt_corrds: ", webcam_kpt_corrds, "abs_distance: ", abs_distance)
                         
-                        # cv2.circle(img, (int(x), int(y)), 15, skeleton_color, -1)
+                            kpt['webcam_coords'] = webcam_kpts_list[kpt_id]['coords']
+                            kpt['abs_distance'] = abs_distance
+                            
+                            if abs_distance <= 80:
+                                circle_coordinates.append((int(x), int(y)))
+                                circle_colors.append((0, 255, 0))  # Green color for correct posture
+                            else:
+                                circle_coordinates.append((int(x), int(y)))
+                                circle_colors.append((0, 0, 255))  # Red color for incorrect posture
+                            
                         for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
                             kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
                             x_a, y_a = scaled_kpt.get(kpt_a_id, (0, 0))
@@ -138,35 +155,64 @@ class Pose:
                             x_b, y_b = scaled_kpt.get(kpt_b_id, (0, 0))
 
                             if kpt_a_id in scaled_kpt and kpt_b_id in scaled_kpt:
-                                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)  
+                                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.skeleton_overlay_color, 80) 
+                        
+                        for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
+                            kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
+                            x_a, y_a = scaled_kpt.get(kpt_a_id, (0, 0))
+
+                            kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
+                            x_b, y_b = scaled_kpt.get(kpt_b_id, (0, 0))
+
+                            if kpt_a_id in scaled_kpt and kpt_b_id in scaled_kpt:
+                                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.skeleton_line_color, 5)
+                                 
+                            # if abs_distance <= 80:
+                            #     cv2.circle(img, (int(x), int(y)), 15, (0, 255, 0), -1)
+                            # else:
+                            #     cv2.circle(img, (int(x), int(y)), 15, (0, 0, 255), -1)
+                        
+                for coord, color in zip(circle_coordinates, circle_colors):
+                    cv2.circle(img, coord, 15, color, -1)
                 
-                """
-                # for kpt_id, (x, y) in normalized_kpt_list.items():
-                #     ## fit the normalized coordinates to real-time size (1920x1080)
-                #     x *= img.shape[1]
-                #     y *= img.shape[0]
-                #     scaled_kpt[kpt_id] = (x, y)
-                #     kpts_list[0]['kpts']['scaled_coords'] = scaled_kpt[kpt_id]
-                    
-                #     # cv2.circle(img, (int(x), int(y)), 15, skeleton_color, -1)
-                #     for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
-                #         kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
-                #         x_a, y_a = scaled_kpt.get(kpt_a_id, (0, 0))
-
-                #         kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
-                #         x_b, y_b = scaled_kpt.get(kpt_b_id, (0, 0))
-
-                #         if kpt_a_id in scaled_kpt and kpt_b_id in scaled_kpt:
-                #             cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), skeleton_color, 80)
-                """
+                self.draw_colors_indicators(img)
             else:
                 return
         # print("updated kpts_list: ", kpts_list) 
-        return kpts_list
+        
+        return ref_kpts_list
 
+    def draw_colors_indicators(self, img):
+        color_mapping = {
+            (255, 0, 255): "Reference motion",
+            (255, 255, 0): "Real-time motion",
+            (0, 255, 0): "Correct joint posture",
+            (0, 0, 255): "Incorrect joint posture"
+        }
+
+        indicator_size = 30  # Size of the color indicator square
+        text_offset = 10  # Offset for the text
+
+        # Define the bottom left corner coordinates for drawing
+        x_start = 20
+        y_start = img.shape[0] - 180  # Adjust as needed
+
+        for idx, (color, label) in enumerate(color_mapping.items()):
+            # Draw the color square
+            cv2.rectangle(img, (x_start, y_start + idx * (indicator_size + text_offset)),
+                          (x_start + indicator_size, y_start + indicator_size + idx * (indicator_size + text_offset)),
+                          color, -1)
+
+            # Draw the color name
+            cv2.putText(img, label, (x_start + indicator_size + 10, y_start + indicator_size + idx * (indicator_size + text_offset) - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 1, cv2.LINE_AA)
+
+        return img
+        
     def is_valid_point(self, point):
         #Check if the point is valid (not None and has valid coordinates).
         return point is not None and all(coord != -1 for coord in point)
+    
     def calculate_angle(self, a, b, c):
         if a is None or b is None or c is None:
             return None
