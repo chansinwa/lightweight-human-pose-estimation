@@ -30,7 +30,7 @@ summary_report = {}
 matching_kpts_report = []
 
 ## Load the JSON data from the file
-with open('frame_report.json', 'r') as file:
+with open('frame_report_video-6.json', 'r') as file:
     skeleton_list = json.load(file)
 
 def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
@@ -327,21 +327,23 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
         # Save the image, Tommy, 02-11-2024
         image_name = "frame_" + str(frame_id) + ".jpg"
         
-        ## this two lines are for saving images
-        # cv2.imwrite(export_path + image_name, img)
-        # cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
-        
-        
         ## Show the tracked image and skeleton image side by side
         if ref_kpts_list is None: 
             ## video detection
             img_with_alpha = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
             combined_img = np.hstack((img_with_alpha, skeleton_img))
             cv2.imshow("Original and Skeleton", combined_img)
+            
+            ## this two lines are for saving images
+            cv2.imwrite(export_path + image_name, img)
+            cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
         else: 
             ### webcam real-time detection
-            img_with_skeleton = cv2.addWeighted(orig_img, 0.5, img, 0.5, 0)
-            cv2.imshow("Realtime webcam", img_with_skeleton) # img
+            img_with_skeleton = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
+            cv2.imshow("Realtime webcam", img_with_skeleton)
+            cv2.imwrite(export_path + image_name, img_with_skeleton)
+        
+        
                 
         key = cv2.waitKey(delay)
         if key == 27:  # esc

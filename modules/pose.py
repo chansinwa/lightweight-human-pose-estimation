@@ -117,7 +117,7 @@ class Pose:
                 circle_colors = []
                 
                 for kpt in ref_kpts_list[0]:
-                    if 'normalized_coords' in kpt:
+                    if 'normalized_coords' in kpt and kpt['coords'] != [-1, -1]:
                         kpt_id = kpt['kpt_id']
                         x, y = kpt['normalized_coords']
                         ## fit the normalized coordinates to real-time size (1920x1080)
@@ -129,6 +129,7 @@ class Pose:
                         # Change the key name from 'coords' to 'ref_coords'
                         kpt['ref_coords'] = kpt.pop('coords')
                         kpt['ref_normalized_coords'] = kpt.pop('normalized_coords')
+                        
                         
                         ## Calculate the abs distance between the keypoints
                         abs_distance = 0
@@ -146,7 +147,7 @@ class Pose:
                             else:
                                 circle_coordinates.append((int(x), int(y)))
                                 circle_colors.append((0, 0, 255))  # Red color for incorrect posture
-                            
+                        
                         for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
                             kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
                             x_a, y_a = scaled_kpt.get(kpt_a_id, (0, 0))
@@ -167,10 +168,6 @@ class Pose:
                             if kpt_a_id in scaled_kpt and kpt_b_id in scaled_kpt:
                                 cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.skeleton_line_color, 5)
                                  
-                            # if abs_distance <= 80:
-                            #     cv2.circle(img, (int(x), int(y)), 15, (0, 255, 0), -1)
-                            # else:
-                            #     cv2.circle(img, (int(x), int(y)), 15, (0, 0, 255), -1)
                         
                 for coord, color in zip(circle_coordinates, circle_colors):
                     cv2.circle(img, coord, 15, color, -1)
@@ -205,7 +202,7 @@ class Pose:
 
             # Draw the color name
             cv2.putText(img, label, (x_start + indicator_size + 10, y_start + indicator_size + idx * (indicator_size + text_offset) - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 1, cv2.LINE_AA)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 1, cv2.LINE_AA)
 
         return img
         
@@ -251,12 +248,14 @@ class Pose:
         # end_angle = start_angle + angle
         
         # # Ensure the angles are in the correct order
-        if end_angle < start_angle:
-            end_angle += 360
+        # if end_angle < start_angle:
+        #     end_angle += 360
         #     print("end_angle", end_angle, "start_angle", start_angle)
             
         #     if ((end_angle % 360) - (start_angle % 360))  > 180:
         #         start_angle, end_angle = end_angle, start_angle  # Swap the angles
+        
+        print("start_angle", start_angle, "end_angle", end_angle)
                 
         # start_angle = start_angle % 360
         # end_angle = end_angle % 360
@@ -286,11 +285,11 @@ class Pose:
 
         # Right Arm
         if self.is_valid_point(RShoulder) and self.is_valid_point(RElbow) and self.is_valid_point(RWrist):
-            cv2.line(img, tuple(RShoulder), tuple(RElbow), (0, 255, 0), 3)  
-            cv2.line(img, tuple(RElbow), tuple(RWrist), (0, 255, 0), 3)  
-            cv2.ellipse(img, tuple(RShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-            cv2.ellipse(img, tuple(RElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-            cv2.ellipse(img, tuple(RWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            # cv2.line(img, tuple(RShoulder), tuple(RElbow), (0, 255, 0), 3)  
+            # cv2.line(img, tuple(RElbow), tuple(RWrist), (0, 255, 0), 3)  
+            # cv2.ellipse(img, tuple(RShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            # cv2.ellipse(img, tuple(RElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            # cv2.ellipse(img, tuple(RWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
             if r_arm_angle is not None:
                 # cv2.putText(img, f"{r_arm_angle:.2f}", tuple(RElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_r, (0, 0, 0), 2)
                 self.draw_text_with_outline(img, f"{r_arm_angle:.1f}", tuple(RElbow), font_scale_r, 2)
@@ -299,15 +298,20 @@ class Pose:
 
         # Left Arm
         if self.is_valid_point(LShoulder) and self.is_valid_point(LElbow) and self.is_valid_point(LWrist):
-            cv2.line(img, tuple(LShoulder), tuple(LElbow), (0, 255, 0), 3)
-            cv2.line(img, tuple(LElbow), tuple(LWrist), (0, 255, 0), 3)  
-            cv2.ellipse(img, tuple(LShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-            cv2.ellipse(img, tuple(LElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-            cv2.ellipse(img, tuple(LWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            # cv2.line(img, tuple(LShoulder), tuple(LElbow), (0, 255, 0), 3)
+            # cv2.line(img, tuple(LElbow), tuple(LWrist), (0, 255, 0), 3)  
+            # cv2.ellipse(img, tuple(LShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            # cv2.ellipse(img, tuple(LElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
+            # cv2.ellipse(img, tuple(LWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
             if l_arm_angle is not None:
                 # cv2.putText(img, f"{l_arm_angle:.2f}", tuple(LElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_l, (0, 0, 0), 2)
                 self.draw_text_with_outline(img, f"{l_arm_angle:.1f}", tuple(LElbow), font_scale_l, 2)
                 # self.draw_angle_sector(img, tuple(LElbow), LShoulder, LWrist) 
+
+
+
+
+
 
 def get_similarity(a, b, threshold=0.5):
     num_similar_kpt = 0
