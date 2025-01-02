@@ -1,6 +1,6 @@
 # Custom ignore
 *.pth
-detection/
+detection/exports/
 *.DS_Store
 *.pkl
 coco/
