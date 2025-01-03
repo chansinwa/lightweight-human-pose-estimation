@@ -323,8 +323,6 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             "kpts": tracking_kpts_list
         })
         
-        
-        # Save the image, Tommy, 02-11-2024
         image_name = "frame_" + str(frame_id) + ".jpg"
         
         ## Show the tracked image and skeleton image side by side
@@ -334,13 +332,14 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             combined_img = np.hstack((img_with_alpha, skeleton_img))
             cv2.imshow("Original and Skeleton", combined_img)
             
-            ## this two lines are for saving images
+            ## Save the images
             cv2.imwrite(export_path + image_name, img)
             cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
         else: 
             ### webcam real-time detection
             img_with_skeleton = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
             cv2.imshow("Realtime webcam", img_with_skeleton)
+            ## Save the images
             cv2.imwrite(export_path + image_name, img_with_skeleton)
         
         

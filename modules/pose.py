@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import math
 
 from modules.keypoints import BODY_PARTS_KPT_IDS, BODY_PARTS_PAF_IDS
 from modules.one_euro_filter import OneEuroFilter
@@ -293,7 +294,8 @@ class Pose:
             if r_arm_angle is not None:
                 # cv2.putText(img, f"{r_arm_angle:.2f}", tuple(RElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_r, (0, 0, 0), 2)
                 self.draw_text_with_outline(img, f"{r_arm_angle:.1f}", tuple(RElbow), font_scale_r, 2)
-                # self.draw_angle_sector(img, tuple(RElbow), RShoulder, RWrist) 
+                # self.draw_angle_sector(img, tuple(RElbow), RShoulder, RWrist)
+                self.draw_arc(img, tuple(RElbow), tuple(RShoulder), tuple(RWrist)) 
                 
 
         # Left Arm
@@ -307,8 +309,38 @@ class Pose:
                 # cv2.putText(img, f"{l_arm_angle:.2f}", tuple(LElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_l, (0, 0, 0), 2)
                 self.draw_text_with_outline(img, f"{l_arm_angle:.1f}", tuple(LElbow), font_scale_l, 2)
                 # self.draw_angle_sector(img, tuple(LElbow), LShoulder, LWrist) 
+                self.draw_arc(img, tuple(LElbow), tuple(LShoulder), tuple(LWrist))
 
 
+    def calculate_clockwise_angle_from_x_axis(self, center, pt):
+        angle_deg = -math.degrees(math.atan2(pt[1] - center[1], pt[0] - center[0]))
+
+        if angle_deg < 0:
+            angle_deg = 360 + angle_deg
+
+        return angle_deg
+    
+    def draw_arc(self, img, center, pt_a, pt_b):
+        xaxis_angle: float = 0
+        end_angle: float = 0
+        
+        angle_a = self.calculate_clockwise_angle_from_x_axis(center, pt_a)
+        angle_b = self.calculate_clockwise_angle_from_x_axis(center, pt_b)
+        
+        if angle_b < angle_a:
+            temp = angle_a
+            angle_a = angle_b
+            angle_b = temp
+            
+        if angle_b - angle_a < 180:
+            xaxis_angle = angle_a
+            end_angle = angle_b - angle_a
+        else:
+            xaxis_angle = angle_b
+            end_angle = 360 - (angle_b - angle_a)
+        
+        print("Center: ", center, "Point A: ", pt_a, "Point B: ", pt_b ,"X-axis angle: ", xaxis_angle, "End angle: ", end_angle)
+        cv2.ellipse(img, center, (30, 30), xaxis_angle, 0, end_angle, (0, 127, 255), 2)
 
 
 
