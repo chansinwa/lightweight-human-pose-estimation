@@ -102,12 +102,12 @@ class Pose:
             if global_kpt_b_id != -1:
                 x_b, y_b = self.keypoints[kpt_b_id]
                 cv2.circle(img, (int(x_b), int(y_b)), 6, Pose.kpts_colors, -1)
+        
+        self.draw_colors_indicators(img)
             
     
-    def draw_skeleton(self, img, ref_kpts_list = None, webcam_kpts_list=None):       
-        # grey_value = 10  # Adjust this value to change the grey tone
-        # skeleton_color = (grey_value, grey_value, grey_value, int(255 * 0.9))  # BGRA format with alpha for transparency
-
+    def draw_skeleton(self, img, ref_kpts_list = None, webcam_kpts_list=None): 
+        backgroud_img = img.copy()      
         assert self.keypoints.shape == (Pose.num_kpts, 2)
         
         if ref_kpts_list is None:
@@ -190,12 +190,14 @@ class Pose:
                 for coord, color in zip(circle_coordinates, circle_colors):
                     cv2.circle(img, coord, 15, color, -1)
                 
-                self.draw_colors_indicators(img)
             else:
                 return
         # print("updated kpts_list: ", kpts_list) 
         
-        return ref_kpts_list
+        ## Give a transparency effect to the skeleton
+        img = cv2.addWeighted(backgroud_img, 0.7, img, 0.3, 0)
+        
+        return img, ref_kpts_list
 
     def draw_colors_indicators(self, img):
         color_mapping = {
@@ -211,6 +213,9 @@ class Pose:
         ## Define the bottom left corner coordinates for drawing
         x_start = 20
         y_start = img.shape[0] - 180  # Adjust as needed
+        
+        ## Draw the background rectangle
+        cv2.rectangle(img, (10, y_start - 10), (x_start + 350, img.shape[0] - 10), (255, 255, 255), -1)
 
         for idx, (color, label) in enumerate(color_mapping.items()):
             ## Draw the color square

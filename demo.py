@@ -30,7 +30,7 @@ summary_report = {}
 matching_kpts_report = []
 
 ## Load the JSON data from the file
-with open('frame_report_video-6.json', 'r') as file:
+with open('frame_report_video-8.json', 'r') as file:
     skeleton_list = json.load(file)
 
 def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
@@ -55,7 +55,7 @@ def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
 
 # Function to calculate statistics of abs_distance
 def calculate_distance_statistics(data):
-    abs_distances = [item['abs_distance'] for sublist in data for item in sublist]
+    abs_distances = [item['abs_distance'] for sublist in data for item in sublist if item.get('abs_distance') is not None]
     max_distance = np.max(abs_distances)
     min_distance = np.min(abs_distances)
     mean_distance = np.mean(abs_distances)
@@ -290,19 +290,33 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             if ref_kpts_list is None:
                 ### video detection
                 pose.draw_skeleton(skeleton_img)
+                pose.draw(img)
+                pose.draw_angles(img)
             else:
                 ### webcam real-time detection
                 ## pass the 18 ref skeleton keypoints and webcam tracking keypoints of the current frame
                 # print("ref_kpts_list:", [kpts['kpts'] for kpts in ref_kpts_list if kpts.get('frame_id') == frame_id], "\nwebcam_kpts_list:", tracking_kpts_list, "\n\n")
-                combined_kpts = pose.draw_skeleton(img, [kpts['kpts'] for kpts in ref_kpts_list if kpts.get('frame_id') == frame_id], [kpts for kpts in tracking_kpts_list if kpts.get('frame_id') == frame_id]) 
+                result = pose.draw_skeleton(img, [kpts['kpts'] for kpts in ref_kpts_list if kpts.get('frame_id') == frame_id], [kpts for kpts in tracking_kpts_list if kpts.get('frame_id') == frame_id]) 
+                
+                if result is not None:
+                    img_with_skeleton, combined_kpts = result
+                else:
+                    img_with_skeleton = img
+                    combined_kpts = None
                 
                 if combined_kpts is not None and len(combined_kpts) > 0:
                     matching_kpts_report.append(combined_kpts[0])
+                
+                pose.draw(img_with_skeleton)
+                pose.draw_angles(img_with_skeleton)
+                
+                img = img_with_skeleton
+                
            
-        for pose in current_poses:
-            # draw the checkpoints and lines on the img
-            pose.draw(img)
-            pose.draw_angles(img)
+        # for pose in current_poses:
+        #     # draw the checkpoints and lines on the img
+        #     pose.draw(img)
+        #     pose.draw_angles(img)
              
         ## Calculate the fps
         current_time = time.time()
@@ -338,10 +352,10 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
         else: 
             ### webcam real-time detection
-            img_with_skeleton = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
-            cv2.imshow("Realtime webcam", img_with_skeleton)
+            # img_with_skeleton = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
+            cv2.imshow("Realtime webcam", img)
             ## Save the images
-            cv2.imwrite(export_path + image_name, img_with_skeleton)
+            cv2.imwrite(export_path + image_name, img)
         
         
                 
