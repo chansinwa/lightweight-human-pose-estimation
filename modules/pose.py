@@ -191,17 +191,17 @@ class Pose:
         indicator_size = 30  # Size of the color indicator square
         text_offset = 10  # Offset for the text
 
-        # Define the bottom left corner coordinates for drawing
+        ## Define the bottom left corner coordinates for drawing
         x_start = 20
         y_start = img.shape[0] - 180  # Adjust as needed
 
         for idx, (color, label) in enumerate(color_mapping.items()):
-            # Draw the color square
+            ## Draw the color square
             cv2.rectangle(img, (x_start, y_start + idx * (indicator_size + text_offset)),
                           (x_start + indicator_size, y_start + indicator_size + idx * (indicator_size + text_offset)),
                           color, -1)
 
-            # Draw the color name
+            ## Draw the color name
             cv2.putText(img, label, (x_start + indicator_size + 10, y_start + indicator_size + idx * (indicator_size + text_offset) - 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 1, cv2.LINE_AA)
 
@@ -222,8 +222,8 @@ class Pose:
         a_length = np.linalg.norm(b-c)
         b_length = np.linalg.norm(a-c)
         c_length = np.linalg.norm(a-b)
-        #use law of cosines to find angle C
-        #cos(B) = (a^2 + c^2 - b^2) / 2ac
+        ## use law of cosines to find angle C
+        ## cos(B) = (a^2 + c^2 - b^2) / 2ac
         angle = np.arccos((a_length**2 + c_length**2 - b_length**2) / (2 * a_length * c_length))
         return np.degrees(angle) #convert to degrees
 
@@ -232,15 +232,17 @@ class Pose:
         return np.linalg.norm(np.array(point1) - np.array(point2))
     
     def draw_text_with_outline(self, img, text, position, font_scale, thickness):
-        # Draw text with an outline effect.
-        # Draw the black outline (border)
+        ## Draw text with an outline effect (black outline (border)).
         cv2.putText(img, text, (position[0]-1, position[1]-1), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness + 1)
         cv2.putText(img, text, (position[0]+1, position[1]-1), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness + 1)
         cv2.putText(img, text, (position[0]-1, position[1]+1), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness + 1)
         cv2.putText(img, text, (position[0]+1, position[1]+1), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness + 1)
-        # Draw the red text on top
-        cv2.putText(img, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), thickness)
-        
+
+        ## Draw the red text on top
+        cv2.putText(img, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
+
+    """
+    ## Old function to draw the angle sector
     def draw_angle_sector(self, img, center, line1, line2, radius=50):
         # Draw a circular sector to represent the angle visually.
         # angle = self.calculate_angle(line1, center, line2)
@@ -262,10 +264,10 @@ class Pose:
         # end_angle = end_angle % 360
         # Draw the arc
         cv2.ellipse(img, center, (radius, radius), 0, start_angle, end_angle, (255, 0, 0), 2)
-
+    """
 
     def draw_angles(self, img):
-        # Get keypoints coordinates
+        ## Get keypoints coordinates
         RShoulder = self.keypoints[self.BODY_PARTS["RShoulder"]]
         RElbow = self.keypoints[self.BODY_PARTS["RElbow"]]
         RWrist = self.keypoints[self.BODY_PARTS["RWrist"]]
@@ -274,55 +276,59 @@ class Pose:
         LElbow = self.keypoints[self.BODY_PARTS["LElbow"]]
         LWrist = self.keypoints[self.BODY_PARTS["LWrist"]]
 
-        # Calculate angles
+        ## Calculate angles
         r_arm_angle = self.calculate_angle(RShoulder, RElbow, RWrist)
         l_arm_angle = self.calculate_angle(LShoulder, LElbow, LWrist)
 
-        # Calculate distance for dynamic angle value text size
+        ## Calculate distance for dynamic angle value text size
         distance_r_arm = self.calculate_distance(RElbow, RWrist)
-        font_scale_r = min(max(distance_r_arm / 100, 0.5), 1.5)
+        font_scale_r = min(max(distance_r_arm / 100, 0.5), 0.5)
         distance_l_arm = self.calculate_distance(LElbow, LWrist)
-        font_scale_l = min(max(distance_l_arm / 100, 0.5), 1.5)
+        font_scale_l = min(max(distance_l_arm / 100, 0.5), 0.5)
 
-        # Right Arm
+        ## Right Arm
         if self.is_valid_point(RShoulder) and self.is_valid_point(RElbow) and self.is_valid_point(RWrist):
-            # cv2.line(img, tuple(RShoulder), tuple(RElbow), (0, 255, 0), 3)  
-            # cv2.line(img, tuple(RElbow), tuple(RWrist), (0, 255, 0), 3)  
-            # cv2.ellipse(img, tuple(RShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-            # cv2.ellipse(img, tuple(RElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-            # cv2.ellipse(img, tuple(RWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
             if r_arm_angle is not None:
-                # cv2.putText(img, f"{r_arm_angle:.2f}", tuple(RElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_r, (0, 0, 0), 2)
-                self.draw_text_with_outline(img, f"{r_arm_angle:.1f}", tuple(RElbow), font_scale_r, 2)
                 # self.draw_angle_sector(img, tuple(RElbow), RShoulder, RWrist)
-                self.draw_arc(img, tuple(RElbow), tuple(RShoulder), tuple(RWrist)) 
+                self.draw_sector(img, tuple(RElbow), tuple(RShoulder), tuple(RWrist)) 
+                # cv2.putText(img, f"{r_arm_angle:.2f}", tuple(RElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_r, (0, 0, 0), 2)
+                self.draw_text_with_outline(img, f"{r_arm_angle:.1f}", tuple(RElbow), font_scale_r, 1)
                 
-
-        # Left Arm
+        ## Left Arm
         if self.is_valid_point(LShoulder) and self.is_valid_point(LElbow) and self.is_valid_point(LWrist):
-            # cv2.line(img, tuple(LShoulder), tuple(LElbow), (0, 255, 0), 3)
-            # cv2.line(img, tuple(LElbow), tuple(LWrist), (0, 255, 0), 3)  
-            # cv2.ellipse(img, tuple(LShoulder), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-            # cv2.ellipse(img, tuple(LElbow), (5, 5), 0, 0, 360, (0, 0, 255), -1)
-            # cv2.ellipse(img, tuple(LWrist), (5, 5), 0, 0, 360, (0, 0, 255), -1)
             if l_arm_angle is not None:
-                # cv2.putText(img, f"{l_arm_angle:.2f}", tuple(LElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_l, (0, 0, 0), 2)
-                self.draw_text_with_outline(img, f"{l_arm_angle:.1f}", tuple(LElbow), font_scale_l, 2)
                 # self.draw_angle_sector(img, tuple(LElbow), LShoulder, LWrist) 
-                self.draw_arc(img, tuple(LElbow), tuple(LShoulder), tuple(LWrist))
-
-
+                self.draw_sector(img, tuple(LElbow), tuple(LShoulder), tuple(LWrist))
+                # cv2.putText(img, f"{l_arm_angle:.2f}", tuple(LElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_l, (0, 0, 0), 2)
+                self.draw_text_with_outline(img, f"{l_arm_angle:.1f}", tuple(LElbow), font_scale_l, 1)
+    
+    ## New function to calculate the angle for drawing the sector, Tommy, 05-01-2024            
     def calculate_clockwise_angle_from_x_axis(self, center, pt):
-        angle_deg = -math.degrees(math.atan2(pt[1] - center[1], pt[0] - center[0]))
-
-        if angle_deg < 0:
-            angle_deg = 360 + angle_deg
+        angle_radian: float = 0
+        angle_deg: float = 0
+            
+        if (pt[0] >= center[0] and pt[1] > center[1]): # Quadrant I
+            angle_radian = math.atan((pt[1] - center[1]) / (pt[0] - center[0])) # arctan(y/x)
+            angle_deg = angle_radian * 180 / math.pi # Convert to degrees
+        elif (pt[0] < center[0] and pt[1] >= center[1]): # Quadrant II
+            angle_radian = math.atan((center[0] - pt[0]) / (pt[1] - center[1])) # arctan(x/y)
+            angle_deg = 90 + angle_radian * 180 / math.pi # Convert to degrees
+        elif (pt[0] <= center[0] and pt[1] < center[1]): # Quadrant III
+            angle_radian = math.atan((center[1] - pt[1]) / (center[0] - pt[0])) # arctan(y/x)
+            angle_deg = 180 + angle_radian * 180 / math.pi # Convert to degrees
+        elif (pt[0] > center[0] and pt[1] <= center[1]): # Quadrant IV
+            angle_radian = math.atan((pt[0] - center[0]) / (center[1] - pt[1])) # arctan(x/y)
+            angle_deg = 270 + angle_radian * 180 / math.pi # Convert to degrees
 
         return angle_deg
     
-    def draw_arc(self, img, center, pt_a, pt_b):
-        xaxis_angle: float = 0
+    ## New function to draw the sector, Tommy, 05-01-2024  
+    def draw_sector(self, img, center, pt_a, pt_b):
+        x_axis_angle: float = 0
         end_angle: float = 0
+        radius = 30
+        arc_color = (0, 127, 255)
+        sector_color = (0, 127, 255)
         
         angle_a = self.calculate_clockwise_angle_from_x_axis(center, pt_a)
         angle_b = self.calculate_clockwise_angle_from_x_axis(center, pt_b)
@@ -333,14 +339,22 @@ class Pose:
             angle_b = temp
             
         if angle_b - angle_a < 180:
-            xaxis_angle = angle_a
+            x_axis_angle = angle_a
             end_angle = angle_b - angle_a
         else:
-            xaxis_angle = angle_b
+            x_axis_angle = angle_b
             end_angle = 360 - (angle_b - angle_a)
         
-        print("Center: ", center, "Point A: ", pt_a, "Point B: ", pt_b ,"X-axis angle: ", xaxis_angle, "End angle: ", end_angle)
-        cv2.ellipse(img, center, (30, 30), xaxis_angle, 0, end_angle, (0, 127, 255), 2)
+        # print("Center: ", center, "Point A: ", pt_a, "Point B: ", pt_b ,"X-axis angle: ", x_axis_angle, "End angle: ", end_angle)
+        
+        ## Draw the arc border line (start andgle always 0)
+        cv2.ellipse(img, center, (radius, radius), x_axis_angle, 0, end_angle, arc_color, 2)
+        
+        ## Draw the filled sector
+        transparency = 0.4
+        original_img = img.copy()
+        cv2.ellipse(img, center, (radius, radius), x_axis_angle, 0, end_angle, sector_color, -1)
+        cv2.addWeighted(img, transparency, original_img, 1 - transparency, 0, img)
 
 
 

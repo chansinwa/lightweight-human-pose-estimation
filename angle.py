@@ -3,12 +3,39 @@ import cv2
 import math
 
 
-def calculate_clockwise_angle_from_x_axis(center, a):
+def calculate_clockwise_angle_from_x_axis(center, pt):
+	"""
+	angle_radian: float = 0
+	angle_deg: float = 0
+		
+	if (pt[0] >= center[0] and pt[1] > center[1]):
+		angle_radian = math.atan((pt[1] - center[1]) / (pt[0] - center[0]))
+		angle_deg = angle_radian * 180 / math.pi
+	elif (pt[0] < center[0] and pt[1] >= center[1]):
+		angle_radian = math.atan((center[0] - pt[0]) / (pt[1] - center[1]))
+		angle_deg = 90 + angle_radian * 180 / math.pi
+	elif (pt[0] <= center[0] and pt[1] < center[1]):
+		angle_radian = math.atan((center[1] - pt[1]) / (center[0] - pt[0]))
+		angle_deg = 180 + angle_radian * 180 / math.pi
+	elif (pt[0] > center[0] and pt[1] <= center[1]):
+		angle_radian = math.atan((pt[0] - center[0]) / (center[1] - pt[1]))
+		angle_deg = 270 + angle_radian * 180 / math.pi
+
+	print("Radian: ", angle_radian, "Degree: ", angle_deg)
+	"""
+	
+	dx = pt[0] - center[0]
+	dy = pt[1] - center[1]
+
+	angle_radian = math.atan2(dy, dx)
+	angle_deg = math.degrees(angle_radian) % 360
+ 
+	"""
 	angle_deg = -math.degrees(math.atan2(a[1] - center[1], a[0] - center[0]))
 
 	if angle_deg < 0:
 		angle_deg = 360 + angle_deg
-
+	"""
 	return angle_deg
 
 """
@@ -30,7 +57,7 @@ Center:  (646, 242) Point A:  (708, 305) Point B:  (690, 178) X-axis angle:  314
 Center:  (871, 247) Point A:  (800, 305) Point B:  (835, 172) X-axis angle:  115.64100582430528 End angle:  103.60442884459253
 Center:  (648, 241) Point A:  (708, 305) Point B:  (693, 179) X-axis angle:  313.1523897340054 End angle:  100.87522321670968
 Center:  (871, 247) Point A:  (799, 305) Point B:  (832, 173) X-axis angle:  117.7904424794521 End angle:  101.06293186090123
-Center:  (652, 243) Point A:  (708, 305) Point B:  (705, 183) X-axis angle:  312.0891621738323 End angle:  96.45560428176259
+1Center:  (652, 243) Point A:  (708, 305) Point B:  (705, 183) X-axis angle:  312.0891621738323 End angle:  96.45560428176259
 """
 
 if __name__ == "__main__":
@@ -42,8 +69,8 @@ if __name__ == "__main__":
 	point_a = (711, 307)
 	point_b = (611, 199)
  
-	cv2.line(img, center, point_a, (255, 0, 0), 1)
-	cv2.line(img, center, point_b, (0, 255, 0), 1)
+	cv2.line(img, center, point_a, (255, 0, 0), 1) # BGR
+	cv2.line(img, center, point_b, (0, 255, 0), 1) # BGR
 
 	xaxis_angle: float = 0
 	end_angle: float = 0
