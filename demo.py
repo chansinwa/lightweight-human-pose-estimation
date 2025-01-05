@@ -277,6 +277,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                             "frame_id": frame_id,
                             "kpt_id": kpt_id,
                             "kpt_name": kpt_name,
+                            "img_size": img.shape[:2],
                             "coords": [x.tolist(), y.tolist()],
                             "normalized_coords": [normalized_x, normalized_y]
                         }

@@ -70,6 +70,7 @@ class Pose:
     def draw(self, img):
         assert self.keypoints.shape == (Pose.num_kpts, 2)
 
+        ## Draw the tracking lines
         for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
             kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
             global_kpt_a_id = self.keypoints[kpt_a_id, 0]
@@ -79,12 +80,28 @@ class Pose:
             kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
             
             global_kpt_b_id = self.keypoints[kpt_b_id, 0]
+            # if global_kpt_b_id != -1:
+            #     x_b, y_b = self.keypoints[kpt_b_id]
+            #     cv2.circle(img, (int(x_b), int(y_b)), 6, Pose.kpts_colors, -1)
+                
+            if global_kpt_a_id != -1 and global_kpt_b_id != -1:
+                x_b, y_b = self.keypoints[kpt_b_id]
+                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.line_color, 5)
+        
+        ## Draw the keypoints
+        for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
+            kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
+            global_kpt_a_id = self.keypoints[kpt_a_id, 0]
+            if global_kpt_a_id != -1:
+                x_a, y_a = self.keypoints[kpt_a_id]
+                cv2.circle(img, (int(x_a), int(y_a)), 6, Pose.kpts_colors, -1)
+            kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
+            
+            global_kpt_b_id = self.keypoints[kpt_b_id, 0]
+            
             if global_kpt_b_id != -1:
                 x_b, y_b = self.keypoints[kpt_b_id]
                 cv2.circle(img, (int(x_b), int(y_b)), 6, Pose.kpts_colors, -1)
-                
-            if global_kpt_a_id != -1 and global_kpt_b_id != -1:
-                cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), Pose.line_color, 5)
             
     
     def draw_skeleton(self, img, ref_kpts_list = None, webcam_kpts_list=None):       
@@ -241,7 +258,7 @@ class Pose:
         ## Draw the red text on top
         cv2.putText(img, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
 
-    """
+    
     ## Old function to draw the angle sector
     def draw_angle_sector(self, img, center, line1, line2, radius=50):
         # Draw a circular sector to represent the angle visually.
@@ -250,9 +267,9 @@ class Pose:
         end_angle = np.degrees(np.arctan2(line2[1] - center[1], line2[0] - center[0]))
         # end_angle = start_angle + angle
         
-        # # Ensure the angles are in the correct order
-        # if end_angle < start_angle:
-        #     end_angle += 360
+        ## Ensure the angles are in the correct order
+        if end_angle < start_angle:
+            end_angle += 360
         #     print("end_angle", end_angle, "start_angle", start_angle)
             
         #     if ((end_angle % 360) - (start_angle % 360))  > 180:
@@ -264,7 +281,6 @@ class Pose:
         # end_angle = end_angle % 360
         # Draw the arc
         cv2.ellipse(img, center, (radius, radius), 0, start_angle, end_angle, (255, 0, 0), 2)
-    """
 
     def draw_angles(self, img):
         ## Get keypoints coordinates
@@ -275,22 +291,51 @@ class Pose:
         LShoulder = self.keypoints[self.BODY_PARTS["LShoulder"]]
         LElbow = self.keypoints[self.BODY_PARTS["LElbow"]]
         LWrist = self.keypoints[self.BODY_PARTS["LWrist"]]
+        
+        Neck = self.keypoints[self.BODY_PARTS["Neck"]]
+        RShoulder = RShoulder
+        RElbow = RElbow
+        
+        Neck = Neck
+        LShoulder = LShoulder
+        LElbow = LElbow
+        
+        Neck = Neck
+        RHip = self.keypoints[self.BODY_PARTS["RHip"]]
+        RAnkle = self.keypoints[self.BODY_PARTS["RAnkle"]]
+        
+        Neck = Neck
+        LHip = self.keypoints[self.BODY_PARTS["LHip"]]
+        LAnkle = self.keypoints[self.BODY_PARTS["LAnkle"]]
 
         ## Calculate angles
         r_arm_angle = self.calculate_angle(RShoulder, RElbow, RWrist)
         l_arm_angle = self.calculate_angle(LShoulder, LElbow, LWrist)
+        r_shoulder_angle = self.calculate_angle(Neck, RShoulder, RElbow)
+        l_shoulder_angle = self.calculate_angle(Neck, LShoulder, LElbow)
+        r_hip_angle = self.calculate_angle(Neck, RHip, RAnkle)
+        l_hip_angle = self.calculate_angle(Neck, LHip, LAnkle)
+        
 
         ## Calculate distance for dynamic angle value text size
         distance_r_arm = self.calculate_distance(RElbow, RWrist)
         font_scale_r = min(max(distance_r_arm / 100, 0.5), 0.5)
         distance_l_arm = self.calculate_distance(LElbow, LWrist)
         font_scale_l = min(max(distance_l_arm / 100, 0.5), 0.5)
+        distance_r_shoulder = self.calculate_distance(RShoulder, RElbow)
+        font_scale_r_shoulder = min(max(distance_r_shoulder / 100, 0.5), 0.5)
+        distance_l_shoulder = self.calculate_distance(LShoulder, LElbow)
+        font_scale_l_shoulder = min(max(distance_l_shoulder / 100, 0.5), 0.5)
+        distance_r_hip = self.calculate_distance(RHip, RAnkle)
+        font_scale_r_hip = min(max(distance_r_hip / 100, 0.5), 0.5)
+        distance_l_hip = self.calculate_distance(LHip, LAnkle)
+        font_scale_l_hip = min(max(distance_l_hip / 100, 0.5), 0.5)
 
         ## Right Arm
         if self.is_valid_point(RShoulder) and self.is_valid_point(RElbow) and self.is_valid_point(RWrist):
             if r_arm_angle is not None:
                 # self.draw_angle_sector(img, tuple(RElbow), RShoulder, RWrist)
-                self.draw_sector(img, tuple(RElbow), tuple(RShoulder), tuple(RWrist)) 
+                self.draw_interior_sector(img, tuple(RElbow), tuple(RShoulder), tuple(RWrist), "right") 
                 # cv2.putText(img, f"{r_arm_angle:.2f}", tuple(RElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_r, (0, 0, 0), 2)
                 self.draw_text_with_outline(img, f"{r_arm_angle:.1f}", tuple(RElbow), font_scale_r, 1)
                 
@@ -298,11 +343,44 @@ class Pose:
         if self.is_valid_point(LShoulder) and self.is_valid_point(LElbow) and self.is_valid_point(LWrist):
             if l_arm_angle is not None:
                 # self.draw_angle_sector(img, tuple(LElbow), LShoulder, LWrist) 
-                self.draw_sector(img, tuple(LElbow), tuple(LShoulder), tuple(LWrist))
+                self.draw_interior_sector(img, tuple(LElbow), tuple(LShoulder), tuple(LWrist), "left")
                 # cv2.putText(img, f"{l_arm_angle:.2f}", tuple(LElbow), cv2.FONT_HERSHEY_SIMPLEX, font_scale_l, (0, 0, 0), 2)
                 self.draw_text_with_outline(img, f"{l_arm_angle:.1f}", tuple(LElbow), font_scale_l, 1)
+        
+        ## Right Shoulder
+        if self.is_valid_point(Neck) and self.is_valid_point(RShoulder) and self.is_valid_point(RElbow):
+            if r_shoulder_angle is not None:
+                # self.draw_angle_sector(img, tuple(RShoulder), Neck, RElbow)
+                self.draw_interior_sector(img, tuple(RShoulder), Neck, RElbow, "right")
+                # cv2.putText(img, f"{r_shoulder_angle:.2f}", tuple(RShoulder), cv2.FONT_HERSHEY_SIMPLEX, font_scale_r_shoulder, (0, 0, 0), 2)
+                self.draw_text_with_outline(img, f"{r_shoulder_angle:.1f}", tuple(RShoulder), font_scale_r_shoulder, 1)
+        
+        ## Left Shoulder
+        if self.is_valid_point(Neck) and self.is_valid_point(LShoulder) and self.is_valid_point(LElbow):
+            if l_shoulder_angle is not None:
+                # self.draw_angle_sector(img, tuple(LShoulder), Neck, LElbow)
+                self.draw_interior_sector(img, tuple(LShoulder), Neck, LElbow, "left")
+                # cv2.putText(img, f"{l_shoulder_angle:.2f}", tuple(LShoulder), cv2.FONT_HERSHEY_SIMPLEX, font_scale_l_shoulder, (0, 0, 0), 2)
+                self.draw_text_with_outline(img, f"{l_shoulder_angle:.1f}", tuple(LShoulder), font_scale_l_shoulder, 1)
+        
+        ## Right Hip
+        if self.is_valid_point(Neck) and self.is_valid_point(RHip) and self.is_valid_point(RAnkle):
+            if r_hip_angle is not None:
+                # self.draw_angle_sector(img, tuple(RHip), Neck, RAnkle)
+                self.draw_interior_sector(img, tuple(RHip), Neck, RAnkle, "right")
+                # cv2.putText(img, f"{r_hip_angle:.2f}", tuple(RHip), cv2.FONT_HERSHEY_SIMPLEX, font_scale_r_hip, (0, 0, 0), 2)
+                self.draw_text_with_outline(img, f"{r_hip_angle:.1f}", tuple(RHip), font_scale_r_hip, 1)
+        
+        ## Left Hip
+        if self.is_valid_point(Neck) and self.is_valid_point(LHip) and self.is_valid_point(LAnkle):
+            if l_hip_angle is not None:
+                # self.draw_angle_sector(img, tuple(LHip), Neck, LAnkle)
+                self.draw_interior_sector(img, tuple(LHip), Neck, LAnkle, "left")
+                # cv2.putText(img, f"{l_hip_angle:.2f}", tuple(LHip), cv2.FONT_HERSHEY_SIMPLEX, font_scale_l_hip, (0, 0, 0), 2)
+                self.draw_text_with_outline(img, f"{l_hip_angle:.1f}", tuple(LHip), font_scale_l_hip, 1)
+        
     
-    ## New function to calculate the angle for drawing the sector, Tommy, 05-01-2024            
+    ## New function to calculate the angle for drawing the sector on the interior angle side, Tommy, 05-01-2024            
     def calculate_clockwise_angle_from_x_axis(self, center, pt):
         angle_radian: float = 0
         angle_deg: float = 0
@@ -322,8 +400,8 @@ class Pose:
 
         return angle_deg
     
-    ## New function to draw the sector, Tommy, 05-01-2024  
-    def draw_sector(self, img, center, pt_a, pt_b):
+    ## New function to draw the sector on the interior angle side, Tommy, 05-01-2024  
+    def draw_interior_sector(self, img, center, pt_a, pt_b, body_part = None):
         x_axis_angle: float = 0
         end_angle: float = 0
         radius = 30
@@ -346,6 +424,20 @@ class Pose:
             end_angle = 360 - (angle_b - angle_a)
         
         # print("Center: ", center, "Point A: ", pt_a, "Point B: ", pt_b ,"X-axis angle: ", x_axis_angle, "End angle: ", end_angle)
+        
+        """
+        ## Determine the sector direction based on the body part
+        if body_part == "left":
+            if angle_a < angle_b:  # Ensure sector points towards the left
+                x_axis_angle = angle_b
+            else:
+                x_axis_angle = angle_a
+        elif body_part == "right":
+            if angle_a < angle_b:  # Ensure sector points towards the right
+                x_axis_angle = angle_a
+            else:
+                x_axis_angle = angle_b
+        """
         
         ## Draw the arc border line (start andgle always 0)
         cv2.ellipse(img, center, (radius, radius), x_axis_angle, 0, end_angle, arc_color, 2)
