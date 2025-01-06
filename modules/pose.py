@@ -26,7 +26,8 @@ class Pose:
     # Customer colors BGR
     kpts_colors = [0, 225, 255]
     line_color = [255, 255, 0]
-    skeleton_overlay_color = [10, 10, 10]
+    # skeleton_overlay_color = [10, 10, 10]
+    skeleton_overlay_color = [255, 0, 0]
     skeleton_line_color = [255, 0, 255]
     
     #added by Sita 07/11/2024
@@ -193,7 +194,7 @@ class Pose:
         # print("updated kpts_list: ", kpts_list) 
         
         ## Give a transparency effect to the skeleton
-        img = cv2.addWeighted(backgroud_img, 0.7, img, 0.3, 0)
+        img = cv2.addWeighted(backgroud_img, 0.6, img, 0.4, 0)
         
         return img, ref_kpts_list
 

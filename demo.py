@@ -30,7 +30,7 @@ summary_report = {}
 matching_kpts_report = []
 
 ## Load the JSON data from the file
-with open('tracking_frame_report_video-2.json', 'r') as file:
+with open('reports/tracking_frame_report_video-12.json', 'r') as file:
     skeleton_list = json.load(file)
 
 def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
