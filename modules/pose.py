@@ -102,8 +102,6 @@ class Pose:
             if global_kpt_b_id != -1:
                 x_b, y_b = self.keypoints[kpt_b_id]
                 cv2.circle(img, (int(x_b), int(y_b)), 6, Pose.kpts_colors, -1)
-        
-        self.draw_colors_indicators(img)
             
     
     def draw_skeleton(self, img, ref_kpts_list = None, webcam_kpts_list=None): 

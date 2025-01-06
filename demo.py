@@ -30,7 +30,7 @@ summary_report = {}
 matching_kpts_report = []
 
 ## Load the JSON data from the file
-with open('frame_report_video-8.json', 'r') as file:
+with open('tracking_frame_report_video-2.json', 'r') as file:
     skeleton_list = json.load(file)
 
 def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
@@ -309,6 +309,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                 
                 pose.draw(img_with_skeleton)
                 pose.draw_angles(img_with_skeleton)
+                pose.draw_colors_indicators(img_with_skeleton)
                 
                 img = img_with_skeleton
                 
