@@ -38,6 +38,7 @@ def calculate_clockwise_angle_from_x_axis(center, pt):
 	"""
 	return angle_deg
 
+
 """
 Center:  (626, 277) Point A:  (711, 307) Point B:  (611, 199) X-axis angle:  340.5599651718238 End angle:  120.3255618828349
 Center:  (893, 270) Point A:  (806, 305) Point B:  (915, 192) X-axis angle:  74.24882633654697 End angle:  127.66603999064473

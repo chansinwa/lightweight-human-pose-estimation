@@ -277,7 +277,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                             "frame_id": frame_id,
                             "kpt_id": kpt_id,
                             "kpt_name": kpt_name,
-                            "img_size": img.shape[:2],
+                            "resolution": img.shape[:2],
                             "coords": [x.tolist(), y.tolist()],
                             "normalized_coords": [normalized_x, normalized_y]
                         }
@@ -327,12 +327,13 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
         current_cpu_load = psutil.cpu_percent()
                 
         ## Write the info on the img, Tommy, 02-11-2024
-        console_log(img, {"filename": filename, "frame_id": frame_id, "screen_size": img.shape[:2], "frame_time": current_time, "fps": fps, "cpu_load": current_cpu_load})
+        console_log(img, {"filename": filename, "frame_id": frame_id, "resolution": img.shape[:2], "frame_time": current_time, "fps": fps, "cpu_load": current_cpu_load})
         
         ## Make the frame report
         tracking_frame_report.append({
             "filename": filename,
             "frame_id": frame_id,
+            "resolution": img.shape[:2],
             "frame_time": current_time,
             "fps": fps,
             "cpu_load": current_cpu_load,
