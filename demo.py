@@ -9,7 +9,9 @@ import shutil
 import time
 import psutil
 import math
-import threading
+import tkinter as tk
+from tkinter import filedialog
+import customtkinter
 
 import threading
 import pandas as pd
@@ -376,12 +378,19 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
     
     return keypoints_report, tracking_frame_report, matching_kpts_report
     
+     
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="""Lightweight human pose estimation python demo.
                        This is just for quick results preview.
                        Please, consider c++ demo for the best performance."""
+    )
+    parser.add_argument(
+        "--demo",
+        type=int,
+        default=0,
+        help="1 for presentation, 0 for development",
     )
     parser.add_argument(
         "--checkpoint-path",
@@ -404,109 +413,283 @@ if __name__ == "__main__":
     parser.add_argument("--track", type=int, default=1, help="track pose id in video")
     parser.add_argument("--smooth", type=int, default=1, help="smooth pose keypoints")
     args = parser.parse_args()
-
-    if args.video == "" and args.images == "":
-        raise ValueError("Either --video or --image has to be provided")
-
+    
+    selected_video_path = None
     net = PoseEstimationWithMobileNet()
-    # checkpoint = torch.load(args.checkpoint_path, map_location='cpu')
-    checkpoint = torch.load(args.checkpoint_path, map_location=device)  # change here
+    checkpoint = torch.load("checkpoint_iter_370000.pth", map_location=device)  # change here
     load_state(net, checkpoint)
+    skeleton_list = []
+    
+    def open_file_dialog():
+        root = tk.Tk()
+        root.withdraw()
+        selected_video_path = filedialog.askopenfilename(title="Choose a video file")
+        root.destroy()
+        return selected_video_path
+    
+    def btn_import_video():
+        print("button pressed: Import video...")
+        global selected_video_path
+        selected_video_path = open_file_dialog()
+        print("selected video path:", selected_video_path)
+        run_video_tracking()
+        
+    def run_video_tracking():
+        print("run_video_tracking...")
 
-    frame_provider = ImageReader(args.images)
-    if args.video != "":
-        frame_provider = VideoReader(args.video)
-    else:
-        args.track = 0
-
-    ## create the export folder
-    current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-    try:
+        frame_provider = VideoReader(selected_video_path)
+        
+        ## create the export folder
+        current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         filename = os.path.basename(frame_provider.file_name)
-    except:
+        export_path = f"detection/exports/{filename}_{current_datetime}/"
+
+        if not os.path.exists(f"{export_path}"):
+            os.makedirs(f"{export_path}")
+        else:
+            shutil.rmtree(f"{export_path}/")
+            os.makedirs(f"{export_path}/")
+
+        print("imported file:", filename)
+        
+        start_time = time.time()
+        print("Start video processing...")
+        
+        result = run_demo(
+                export_path,
+                filename,
+                net,
+                frame_provider,
+                256,
+                "",
+                1,
+                1
+            )
+        
+        total_time = time.time() - start_time
+        print(f"Total processing time: {total_time:.2f} seconds")
+        
+        ## Handle the reports
+        print("result length:", len(result))
+        keypoints_report, tracking_frame_report, matching_kpts_report = result
+        
+        avg_fps = sum([frame['fps'] for frame in tracking_frame_report]) / len(tracking_frame_report)
+        avg_cpu_load = sum([frame['cpu_load'] for frame in tracking_frame_report]) / len(tracking_frame_report)
+        
+        summary_report = {
+            "datetime": current_datetime,
+            "filename": filename,
+            "total_time": total_time,
+            "avg_fps": avg_fps,
+            "avg_cpu_load": avg_cpu_load,
+        }
+        
+        with open(f"{export_path}tracking_frame_report.json", "w") as file:
+            json.dump(tracking_frame_report, file, indent=4)
+        
+        with open(f"{export_path}summary_report.json", "w") as file:
+            json.dump(summary_report, file, indent=4)
+        
+        global skeleton_list
+        skeleton_list = tracking_frame_report
+        
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        
+        ## Go back to the customTkinter window, add a button with text "Are you ready?"
+        button_ready_for_realtime = customtkinter.CTkButton(app, text="Are you ready?", width=300, height=50, command=run_realtime_tracking)
+        button_ready_for_realtime.grid(row=2, column=0, padx=0, pady=(20, 10))
+    
+    def run_realtime_tracking():
+        print("run_realtime_tracking...")
+        ## create the export folder
+        frame_provider = VideoReader("2")
+        current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         filename = "webcam"
-    export_path = f"detection/exports/{filename}_{current_datetime}/"
-
-    if not os.path.exists(f"{export_path}"):
-        os.makedirs(f"{export_path}")
-    else:
-        shutil.rmtree(f"{export_path}/")
-        os.makedirs(f"{export_path}/")
-
-    print("imported file:", filename)
-    
-
-    start_time = time.time()
-    print("Start processing...")
-    result = None
-    if args.video == '0' or args.video == '1' or args.video == '2':
-        ### Real-time webcam detection
+        export_path = f"detection/exports/{filename}_{current_datetime}/"
+        if not os.path.exists(f"{export_path}"):
+            os.makedirs(f"{export_path}")
+        else:
+            shutil.rmtree(f"{export_path}/")
+            os.makedirs(f"{export_path}/")
+            
+        start_time = time.time()
+        print("Start processing...")
+        result = None
+        
         result = run_demo(
-            export_path,
-            filename,
-            net,
-            frame_provider,
-            args.height_size,
-            args.cpu,
-            args.track,
-            args.smooth,
-            skeleton_list
-        )
+                export_path,
+                filename,
+                net,
+                frame_provider,
+                256,
+                "",
+                1,
+                1,
+                skeleton_list
+            )
+        
+        total_time = time.time() - start_time
+        print(f"Total processing time: {total_time:.2f} seconds")
+        
+        ## Handle the reports
+        print("result length:", len(result))
+        keypoints_report, tracking_frame_report, matching_kpts_report = result
+        
+        avg_fps = sum([frame['fps'] for frame in tracking_frame_report]) / len(tracking_frame_report)
+        avg_cpu_load = sum([frame['cpu_load'] for frame in tracking_frame_report]) / len(tracking_frame_report)
+        
+        if filename == 'webcam':
+            max_distance, min_distance, mean_distance, median_distance, std_distance = calculate_distance_statistics(matching_kpts_report)
+        
+        summary_report = {
+            "datetime": current_datetime,
+            "filename": filename,
+            "total_time": total_time,
+            "avg_fps": avg_fps,
+            "avg_cpu_load": avg_cpu_load,
+            "max_distance": max_distance,
+            "min_distance": min_distance,
+            "mean_distance": mean_distance,
+            "median_distance": median_distance,
+            "std_distance": std_distance
+        }
+            
+        with open(f"{export_path}tracking_frame_report.json", "w") as file:
+            json.dump(tracking_frame_report, file, indent=4)
+        
+        with open(f"{export_path}summary_report.json", "w") as file:
+            json.dump(summary_report, file, indent=4)
+        
+        with open(f"{export_path}matching_kpts_report.json", "w") as file:
+            json.dump(matching_kpts_report, file, indent=4)
+            
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        
+        
+        
+    if args.demo == 1:
+        print("Demo mode is on")
+        
+        ## Init the customTkinter window
+        app = customtkinter.CTk()
+        app.geometry("1080x607")
+        app.title("Lightweight OpenPose Demo")
+        
+        label = customtkinter.CTkLabel(app, text="Choose your exercise video for tracking", fg_color="transparent", font=("Arial", 20))
+        button = customtkinter.CTkButton(app, text="Import", width=200, command=btn_import_video)
+        
+        app.grid_columnconfigure(0, weight=1)
+        label.grid(row=0, column=0, padx=0, pady=(20, 10))
+        button.grid(row=1, column=0, padx=0, pady=0)
+        
+        app.mainloop()
+        
     else:
-        ### Video detection
-        result = run_demo(
-            export_path,
-            filename,
-            net,
-            frame_provider,
-            args.height_size,
-            args.cpu,
-            args.track,
-            args.smooth
-        )
-        
-    total_time = time.time() - start_time
-    print(f"Total processing time: {total_time:.2f} seconds")
-    
-    ## Handle the reports
-    print("result length:", len(result))
-    keypoints_report, tracking_frame_report, matching_kpts_report = result
-    
-    avg_fps = sum([frame['fps'] for frame in tracking_frame_report]) / len(tracking_frame_report)
-    avg_cpu_load = sum([frame['cpu_load'] for frame in tracking_frame_report]) / len(tracking_frame_report)
-    
-    if filename == 'webcam':
-        max_distance, min_distance, mean_distance, median_distance, std_distance = calculate_distance_statistics(matching_kpts_report)
-    
-    summary_report = {
-        "datetime": current_datetime,
-        "filename": filename,
-        "total_time": total_time,
-        "avg_fps": avg_fps,
-        "avg_cpu_load": avg_cpu_load,
-        "max_distance": max_distance if filename == 'webcam' else None,
-        "min_distance": min_distance if filename == 'webcam' else None,
-        "mean_distance": mean_distance if filename == 'webcam' else None,
-        "median_distance": median_distance if filename == 'webcam' else None,
-        "std_distance": std_distance if filename == 'webcam' else None
-    }
-    
-    ## export JSON files
-    # with open(f"{export_path}kpts_report.json", "w") as file:
-    #     json.dump(keypoints_report, file, indent=4)
-        
-    with open(f"{export_path}tracking_frame_report.json", "w") as file:
-        json.dump(tracking_frame_report, file, indent=4)
-    
-    with open(f"{export_path}summary_report.json", "w") as file:
-        json.dump(summary_report, file, indent=4)
-    
-    with open(f"{export_path}matching_kpts_report.json", "w") as file:
-        json.dump(matching_kpts_report, file, indent=4)
-        
-    # combined_frame_report = combine_frame_report(frame_report, webcam_frame_report)
-    # with open(f"{export_path}combined_frame_report.json", 'w') as file:
-    #     json.dump(combined_frame_report, file, indent=4)
+        print("Demo mode is off")
 
-    # Add this line to prevent the OpenCV windows from closing automatically
-    cv2.waitKey(0)
+        if args.video == "" and args.images == "":
+            raise ValueError("Either --video or --image has to be provided")
+
+        net = PoseEstimationWithMobileNet()
+        # checkpoint = torch.load(args.checkpoint_path, map_location='cpu')
+        checkpoint = torch.load(args.checkpoint_path, map_location=device)  # change here
+        load_state(net, checkpoint)
+
+        frame_provider = ImageReader(args.images)
+        if args.video != "":
+            frame_provider = VideoReader(args.video)
+        else:
+            args.track = 0
+
+        ## create the export folder
+        current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        try:
+            filename = os.path.basename(frame_provider.file_name)
+        except:
+            filename = "webcam"
+        export_path = f"detection/exports/{filename}_{current_datetime}/"
+
+        if not os.path.exists(f"{export_path}"):
+            os.makedirs(f"{export_path}")
+        else:
+            shutil.rmtree(f"{export_path}/")
+            os.makedirs(f"{export_path}/")
+
+        print("imported file:", filename)
+        
+        start_time = time.time()
+        print("Start processing...")
+        result = None
+        if args.video == '0' or args.video == '1' or args.video == '2':
+            ### Real-time webcam detection
+            result = run_demo(
+                export_path,
+                filename,
+                net,
+                frame_provider,
+                args.height_size,
+                args.cpu,
+                args.track,
+                args.smooth,
+                skeleton_list
+            )
+        else:
+            ### Video detection
+            result = run_demo(
+                export_path,
+                filename,
+                net,
+                frame_provider,
+                args.height_size,
+                args.cpu,
+                args.track,
+                args.smooth
+            )
+            
+        total_time = time.time() - start_time
+        print(f"Total processing time: {total_time:.2f} seconds")
+        
+        ## Handle the reports
+        print("result length:", len(result))
+        keypoints_report, tracking_frame_report, matching_kpts_report = result
+        
+        avg_fps = sum([frame['fps'] for frame in tracking_frame_report]) / len(tracking_frame_report)
+        avg_cpu_load = sum([frame['cpu_load'] for frame in tracking_frame_report]) / len(tracking_frame_report)
+        
+        if filename == 'webcam':
+            max_distance, min_distance, mean_distance, median_distance, std_distance = calculate_distance_statistics(matching_kpts_report)
+        
+        summary_report = {
+            "datetime": current_datetime,
+            "filename": filename,
+            "total_time": total_time,
+            "avg_fps": avg_fps,
+            "avg_cpu_load": avg_cpu_load,
+            "max_distance": max_distance if filename == 'webcam' else None,
+            "min_distance": min_distance if filename == 'webcam' else None,
+            "mean_distance": mean_distance if filename == 'webcam' else None,
+            "median_distance": median_distance if filename == 'webcam' else None,
+            "std_distance": std_distance if filename == 'webcam' else None
+        }
+        
+        ## export JSON files
+        # with open(f"{export_path}kpts_report.json", "w") as file:
+        #     json.dump(keypoints_report, file, indent=4)
+            
+        with open(f"{export_path}tracking_frame_report.json", "w") as file:
+            json.dump(tracking_frame_report, file, indent=4)
+        
+        with open(f"{export_path}summary_report.json", "w") as file:
+            json.dump(summary_report, file, indent=4)
+        
+        with open(f"{export_path}matching_kpts_report.json", "w") as file:
+            json.dump(matching_kpts_report, file, indent=4)
+            
+        # combined_frame_report = combine_frame_report(frame_report, webcam_frame_report)
+        # with open(f"{export_path}combined_frame_report.json", 'w') as file:
+        #     json.dump(combined_frame_report, file, indent=4)
+
+        # Add this line to prevent the OpenCV windows from closing automatically
+        cv2.waitKey(0)
