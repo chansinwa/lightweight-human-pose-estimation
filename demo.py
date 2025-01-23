@@ -35,25 +35,25 @@ matching_kpts_report = []
 with open('reports/tracking_frame_report_video-12.json', 'r') as file:
     skeleton_list = json.load(file)
 
-def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
-    """
-    Calculate the Object Keypoint Similarity (OKS) between predicted and ground truth keypoints.
+# def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
+#     """
+#     Calculate the Object Keypoint Similarity (OKS) between predicted and ground truth keypoints.
 
-    :param pred_keypoints: Array of predicted keypoints (shape: K x 2)
-    :param gt_keypoints: Array of ground truth keypoints (shape: K x 2)
-    :param area: Area of the bounding box around the object
-    :param keypoint_variance: Variance for each keypoint
-    :return: OKS value
-    """
-    assert pred_keypoints.shape == gt_keypoints.shape
-    K = pred_keypoints.shape[0]
+#     :param pred_keypoints: Array of predicted keypoints (shape: K x 2)
+#     :param gt_keypoints: Array of ground truth keypoints (shape: K x 2)
+#     :param area: Area of the bounding box around the object
+#     :param keypoint_variance: Variance for each keypoint
+#     :return: OKS value
+#     """
+#     assert pred_keypoints.shape == gt_keypoints.shape
+#     K = pred_keypoints.shape[0]
 
-    # Calculate distances for each keypoint
-    distances = np.linalg.norm(pred_keypoints - gt_keypoints, axis=1)
+#     # Calculate distances for each keypoint
+#     distances = np.linalg.norm(pred_keypoints - gt_keypoints, axis=1)
 
-    # Calculate OKS
-    oks = np.sum(np.exp(-distances ** 2 / (2 * (keypoint_variance ** 2)))) / K
-    return oks
+#     # Calculate OKS
+#     oks = np.sum(np.exp(-distances ** 2 / (2 * (keypoint_variance ** 2)))) / K
+#     return oks
 
 # Function to calculate statistics of abs_distance
 def calculate_distance_statistics(data):
@@ -195,6 +195,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
     keypoints_report = []
     
     frame_id = 0
+    all_keypoints_data = []
 
     for img in image_provider:
         tracking_kpts_list = []
@@ -234,6 +235,8 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             pose = Pose(pose_keypoints, pose_entries[n][18])
             current_poses.append(pose)
             
+        # Collect keypoints data for this frame
+        all_keypoints_data.append(current_poses)
         # print(current_poses)
 
         if track:
@@ -315,12 +318,6 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                 
                 img = img_with_skeleton
                 
-           
-        # for pose in current_poses:
-        #     # draw the checkpoints and lines on the img
-        #     pose.draw(img)
-        #     pose.draw_angles(img)
-             
         ## Calculate the fps
         current_time = time.time()
         fps = round(1.0 / (current_time - fps_time), 2)
@@ -374,6 +371,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
 
         frame_id += 1
         fps_time = time.time()
+    
     
     
     return keypoints_report, tracking_frame_report, matching_kpts_report
@@ -499,11 +497,13 @@ if __name__ == "__main__":
         ## Go back to the customTkinter window, add a button with text "Are you ready?"
         button_ready_for_realtime = customtkinter.CTkButton(app, text="Are you ready?", width=300, height=50, command=run_realtime_tracking)
         button_ready_for_realtime.grid(row=2, column=0, padx=0, pady=(20, 10))
+        result_label = customtkinter.CTkLabel(app, text="", fg_color="transparent", font=("Arial", 18))
+        result_label.grid(row=2, column=0, padx=0, pady=(10, 20))  # Position the result label
     
     def run_realtime_tracking():
         print("run_realtime_tracking...")
         ## create the export folder
-        frame_provider = VideoReader("2")
+        frame_provider = VideoReader("0") # "0" is sita macbook's webcam
         current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         filename = "webcam"
         export_path = f"detection/exports/{filename}_{current_datetime}/"
@@ -541,7 +541,8 @@ if __name__ == "__main__":
         
         if filename == 'webcam':
             max_distance, min_distance, mean_distance, median_distance, std_distance = calculate_distance_statistics(matching_kpts_report)
-        
+            # individual_rms, overall_rms = keypoints_matching_score(matching_kpts_report)
+            
         summary_report = {
             "datetime": current_datetime,
             "filename": filename,
@@ -552,9 +553,44 @@ if __name__ == "__main__":
             "min_distance": min_distance,
             "mean_distance": mean_distance,
             "median_distance": median_distance,
-            "std_distance": std_distance
+            "std_distance": std_distance,
         }
-            
+        
+        # flattened_report = [item for sublist in matching_kpts_report for item in sublist]
+        # # Use abs_distance as individual RMS
+        # individual_rms = [kpt.get('abs_distance', 0) for kpt in flattened_report if isinstance(kpt, dict)]
+        # overall_rms = np.mean(individual_rms) if individual_rms else 0  # Calculate overall RMS
+
+        
+        # # Threshold check for individual RMS
+        # threshold = 10  
+        # high_rms_count = sum(1 for rms in individual_rms if rms >= threshold)
+        # total_keypoints = len(individual_rms)
+        # percentage_high_rms = (high_rms_count / total_keypoints) * 100 if total_keypoints > 0 else 0
+
+        # # Determine matching quality based on percentage
+        # if percentage_high_rms > 80:
+        #     matching_quality = "Perfect matching"
+        # elif 50 <= percentage_high_rms <= 80:
+        #     matching_quality = "Good matching"
+        # elif 30 <= percentage_high_rms < 50:
+        #     matching_quality = "Not matching enough"
+        # else:
+        #     matching_quality = "Poor matching"
+
+        # # Threshold check for overall RMS
+        # overall_rms_threshold = 80  # Set your overall RMS threshold here
+        # if overall_rms > overall_rms_threshold:
+        #     overall_quality = "Overall perfect"
+        # elif 60 <= overall_rms <= overall_rms_threshold:
+        #     overall_quality = "Overall not bad"
+        # else:
+        #     overall_quality = "Overall poor"
+
+        # # Print results to the screen
+        # result_label.configure(text=f"Matching Quality: {matching_quality}\nOverall RMS Quality: {overall_quality}")
+
+        
         with open(f"{export_path}tracking_frame_report.json", "w") as file:
             json.dump(tracking_frame_report, file, indent=4)
         
@@ -579,10 +615,12 @@ if __name__ == "__main__":
         
         label = customtkinter.CTkLabel(app, text="Choose your exercise video for tracking", fg_color="transparent", font=("Arial", 20))
         button = customtkinter.CTkButton(app, text="Import", width=200, command=btn_import_video)
+        result_label = customtkinter.CTkLabel(app, text="", fg_color="transparent", font=("Arial", 18))
         
         app.grid_columnconfigure(0, weight=1)
         label.grid(row=0, column=0, padx=0, pady=(20, 10))
         button.grid(row=1, column=0, padx=0, pady=0)
+        result_label.grid(row=5, column=0, padx=0, pady=(10, 20))  # the result label position
         
         app.mainloop()
         
@@ -660,7 +698,8 @@ if __name__ == "__main__":
         
         if filename == 'webcam':
             max_distance, min_distance, mean_distance, median_distance, std_distance = calculate_distance_statistics(matching_kpts_report)
-        
+            # individual_rms, overall_rms = keypoints_matching_score(matching_kpts_report)
+            
         summary_report = {
             "datetime": current_datetime,
             "filename": filename,
@@ -671,7 +710,7 @@ if __name__ == "__main__":
             "min_distance": min_distance if filename == 'webcam' else None,
             "mean_distance": mean_distance if filename == 'webcam' else None,
             "median_distance": median_distance if filename == 'webcam' else None,
-            "std_distance": std_distance if filename == 'webcam' else None
+            "std_distance": std_distance if filename == 'webcam' else None,
         }
         
         ## export JSON files
