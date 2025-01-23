@@ -347,8 +347,8 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             cv2.imshow("Original and Skeleton", combined_img)
             
             ## Save the images
-            cv2.imwrite(export_path + image_name, img)
-            cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
+            # cv2.imwrite(export_path + image_name, img)
+            # cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
     #         my_image = customtkinter.CTkImage(light_image=Image.open(export_path + image_name), dark_image=Image.open(export_path + image_name),
 	# size=(img.shape[1], img.shape[0]))
         else: 
@@ -356,7 +356,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             # img_with_skeleton = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
             cv2.imshow("Realtime webcam", img)
             ## Save the images
-            cv2.imwrite(export_path + image_name, img)
+            # cv2.imwrite(export_path + image_name, img)
     #         my_image = customtkinter.CTkImage(light_image=Image.open(export_path + image_name), dark_image=Image.open(export_path + image_name),
 	# size=(img.shape[1], img.shape[0]))
         
