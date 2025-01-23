@@ -5,7 +5,56 @@ import math
 from modules.keypoints import BODY_PARTS_KPT_IDS, BODY_PARTS_PAF_IDS
 from modules.one_euro_filter import OneEuroFilter
 
+def pose_init(img, init_frame):
+    backgroud_img = img.copy()
+    scaled_kpt = {}
+    circle_coordinates = []
+    circle_colors = []
+    
+    print("init_frame: ", init_frame)
+    for kpt in init_frame["kpts"]:
+        if 'normalized_coords' in kpt and kpt['coords'] != [-1, -1]:
+            kpt_id = kpt['kpt_id']
+            x, y = kpt['normalized_coords']
+            ## fit the normalized coordinates to real-time size (1920x1080)
+            x *= img.shape[1]
+            y *= img.shape[0]
+            scaled_kpt[kpt_id] = [x, y]
+            # kpt['ref_scaled_coords'] = scaled_kpt[kpt_id]
+            
+            # Change the key name from 'coords' to 'ref_coords'
+            # kpt['ref_coords'] = kpt.pop('coords')
+            # kpt['ref_normalized_coords'] = kpt.pop('normalized_coords')
 
+            for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
+                kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
+                x_a, y_a = scaled_kpt.get(kpt_a_id, (0, 0))
+
+                kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
+                x_b, y_b = scaled_kpt.get(kpt_b_id, (0, 0))
+
+                if kpt_a_id in scaled_kpt and kpt_b_id in scaled_kpt:
+                    cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), [255, 0, 0], 80) 
+            
+            for part_id in range(len(BODY_PARTS_PAF_IDS) - 2):
+                kpt_a_id = BODY_PARTS_KPT_IDS[part_id][0]
+                x_a, y_a = scaled_kpt.get(kpt_a_id, (0, 0))
+
+                kpt_b_id = BODY_PARTS_KPT_IDS[part_id][1]
+                x_b, y_b = scaled_kpt.get(kpt_b_id, (0, 0))
+
+                if kpt_a_id in scaled_kpt and kpt_b_id in scaled_kpt:
+                    cv2.line(img, (int(x_a), int(y_a)), (int(x_b), int(y_b)), [255, 0, 255], 5)
+        else:
+            print("No ref_kpt from video")
+                        
+
+    
+    ## Give a transparency effect to the skeleton
+    img = cv2.addWeighted(backgroud_img, 0.6, img, 0.4, 0)
+    
+    return img
+    
 class Pose:
     num_kpts = 18
     kpt_names = ['nose', 'neck',
@@ -67,6 +116,7 @@ class Pose:
         if self.id is None:
             self.id = Pose.last_id + 1
             Pose.last_id += 1
+        
 
     def draw(self, img):
         assert self.keypoints.shape == (Pose.num_kpts, 2)

@@ -12,6 +12,7 @@ import math
 import tkinter as tk
 from tkinter import filedialog
 import customtkinter
+from PIL import Image
 
 import threading
 import pandas as pd
@@ -20,7 +21,7 @@ import json
 from models.with_mobilenet import PoseEstimationWithMobileNet
 from modules.keypoints import extract_keypoints, group_keypoints
 from modules.load_state import load_state
-from modules.pose import Pose, track_poses
+from modules.pose import Pose, track_poses, pose_init
 from val import normalize, pad_width
 
 device = torch.device(
@@ -30,10 +31,6 @@ device = torch.device(
 skeleton_list = []
 summary_report = {}
 matching_kpts_report = []
-
-## Load the JSON data from the file
-with open('reports/tracking_frame_report_video-12.json', 'r') as file:
-    skeleton_list = json.load(file)
 
 def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
     """
@@ -176,7 +173,6 @@ def console_log(img, msg):
     return img
 
 
-
 def run_demo(export_path, filename, net, image_provider, height_size, cpu, track, smooth, ref_kpts_list=None):      
     net = net.eval()
     # if not cpu:
@@ -198,7 +194,6 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
 
     for img in image_provider:
         tracking_kpts_list = []
-        orig_img = img.copy()
         heatmaps, pafs, scale, pad = infer_fast(
             net, img, height_size, stride, upsample_ratio, cpu
         )
@@ -354,12 +349,16 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
             ## Save the images
             cv2.imwrite(export_path + image_name, img)
             cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
+    #         my_image = customtkinter.CTkImage(light_image=Image.open(export_path + image_name), dark_image=Image.open(export_path + image_name),
+	# size=(img.shape[1], img.shape[0]))
         else: 
             ### webcam real-time detection
             # img_with_skeleton = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
             cv2.imshow("Realtime webcam", img)
             ## Save the images
             cv2.imwrite(export_path + image_name, img)
+    #         my_image = customtkinter.CTkImage(light_image=Image.open(export_path + image_name), dark_image=Image.open(export_path + image_name),
+	# size=(img.shape[1], img.shape[0]))
         
         
                 
@@ -377,8 +376,45 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
     
     
     return keypoints_report, tracking_frame_report, matching_kpts_report
+
+def run_pose_init(export_path, filename, net, image_provider, height_size, cpu, track, smooth, ref_kpts_list=None):
+    delay = 1
+    net = net.eval()
+    # if not cpu:
+    #     net = net.cuda()
+    net = net.to(device)  # Change here
     
-     
+    pose_init_duration = 5
+    pose_init_duration += 1
+    init_frame = ref_kpts_list[0]
+    
+    init_time = time.time()
+    for img in image_provider:
+        img_with_skeleton = pose_init(img, init_frame)
+        
+        # Draw countdown timer on the top left corner
+        countdown = max(1, pose_init_duration - int(time.time() - init_time))
+        cv2.putText(img_with_skeleton, f"{countdown}", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 5, (255, 255, 255), 10)
+        
+        cv2.imshow("Pose Init", img_with_skeleton)
+
+    
+        key = cv2.waitKey(delay)
+        if key == 27 or time.time() - init_time > pose_init_duration:  # esc or 5 seconds elapsed
+            cv2.destroyAllWindows()  # Close all OpenCV windows
+            break
+        
+        elif key == 112:  # 'p'
+            if delay == 1:
+                delay = 0
+            else:
+                delay = 1
+        
+        # cv2.waitKey(0)
+    return
+    
+            
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -499,11 +535,12 @@ if __name__ == "__main__":
         ## Go back to the customTkinter window, add a button with text "Are you ready?"
         button_ready_for_realtime = customtkinter.CTkButton(app, text="Are you ready?", width=300, height=50, command=run_realtime_tracking)
         button_ready_for_realtime.grid(row=2, column=0, padx=0, pady=(20, 10))
+            
     
     def run_realtime_tracking():
         print("run_realtime_tracking...")
         ## create the export folder
-        frame_provider = VideoReader("2")
+        frame_provider = VideoReader("0")
         current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         filename = "webcam"
         export_path = f"detection/exports/{filename}_{current_datetime}/"
@@ -516,6 +553,18 @@ if __name__ == "__main__":
         start_time = time.time()
         print("Start processing...")
         result = None
+        
+        ## Pose Init Step
+        run_pose_init(
+            export_path,
+            filename,
+            net,
+            frame_provider,
+            256,
+            "",
+            1,
+            1,
+            skeleton_list)
         
         result = run_demo(
                 export_path,
@@ -573,6 +622,7 @@ if __name__ == "__main__":
         print("Demo mode is on")
         
         ## Init the customTkinter window
+        customtkinter.set_appearance_mode("light")
         app = customtkinter.CTk()
         app.geometry("1080x607")
         app.title("Lightweight OpenPose Demo")
@@ -619,11 +669,17 @@ if __name__ == "__main__":
 
         print("imported file:", filename)
         
+        ## Load the JSON data from the file
+        with open('reports/tracking_frame_report_video-2.json', 'r') as file:
+            skeleton_list = json.load(file)
+        
         start_time = time.time()
         print("Start processing...")
         result = None
-        if args.video == '0' or args.video == '1' or args.video == '2':
+        if args.video == '0' or args.video == '1' or args.video == '2' or args.video == '3' or args.video == '4':
             ### Real-time webcam detection
+            
+            # real-time webcam
             result = run_demo(
                 export_path,
                 filename,
@@ -655,8 +711,11 @@ if __name__ == "__main__":
         print("result length:", len(result))
         keypoints_report, tracking_frame_report, matching_kpts_report = result
         
-        avg_fps = sum([frame['fps'] for frame in tracking_frame_report]) / len(tracking_frame_report)
-        avg_cpu_load = sum([frame['cpu_load'] for frame in tracking_frame_report]) / len(tracking_frame_report)
+        avg_fps = -1
+        avg_cpu_load = -1
+        if (len(tracking_frame_report) != 0 and len(matching_kpts_report) != 0):
+            avg_fps = sum([frame['fps'] for frame in tracking_frame_report]) / len(tracking_frame_report)
+            avg_cpu_load = sum([frame['cpu_load'] for frame in tracking_frame_report]) / len(tracking_frame_report)
         
         if filename == 'webcam':
             max_distance, min_distance, mean_distance, median_distance, std_distance = calculate_distance_statistics(matching_kpts_report)
