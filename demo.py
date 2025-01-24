@@ -611,8 +611,8 @@ if __name__ == "__main__":
 
         
         # Threshold check for individual RMS
-        threshold = 10  
-        high_rms_count = sum(1 for rms in individual_rms if rms >= threshold)
+        threshold = 80  
+        high_rms_count = sum(1 for rms in individual_rms if rms < threshold)
         total_keypoints = len(individual_rms)
         percentage_high_rms = (high_rms_count / total_keypoints) * 100 if total_keypoints > 0 else 0
 
@@ -627,12 +627,12 @@ if __name__ == "__main__":
             matching_quality = "Poor matching"
 
         # Threshold check for overall RMS
-        overall_rms_threshold = 80  # Set your overall RMS threshold here
-        if overall_rms > overall_rms_threshold:
+        overall_rms_threshold = 40  # Set your overall RMS threshold here
+        if overall_rms < overall_rms_threshold:
             overall_quality = "Overall perfect"
-        elif 60 <= overall_rms <= overall_rms_threshold:
+        elif 60 > overall_rms > overall_rms_threshold:
             overall_quality = "Overall not bad"
-        else:
+        elif 60 < overall_rms:
             overall_quality = "Overall poor"
 
         # Print results to the screen
