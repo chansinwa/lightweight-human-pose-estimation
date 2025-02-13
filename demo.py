@@ -32,6 +32,7 @@ skeleton_list = []
 summary_report = {}
 matching_kpts_report = []
 
+
 def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
     """
     Calculate the Object Keypoint Similarity (OKS) between predicted and ground truth keypoints.
@@ -49,19 +50,26 @@ def calculate_oks(pred_keypoints, gt_keypoints, area, keypoint_variance):
     distances = np.linalg.norm(pred_keypoints - gt_keypoints, axis=1)
 
     # Calculate OKS
-    oks = np.sum(np.exp(-distances ** 2 / (2 * (keypoint_variance ** 2)))) / K
+    oks = np.sum(np.exp(-(distances**2) / (2 * (keypoint_variance**2)))) / K
     return oks
+
 
 # Function to calculate statistics of abs_distance
 def calculate_distance_statistics(data):
-    abs_distances = [item['abs_distance'] for sublist in data for item in sublist if item.get('abs_distance') is not None]
+    abs_distances = [
+        item["abs_distance"]
+        for sublist in data
+        for item in sublist
+        if item.get("abs_distance") is not None
+    ]
     max_distance = np.max(abs_distances)
     min_distance = np.min(abs_distances)
     mean_distance = np.mean(abs_distances)
     median_distance = np.median(abs_distances)
     std_distance = np.std(abs_distances)
-    
+
     return max_distance, min_distance, mean_distance, median_distance, std_distance
+
 
 class ImageReader(object):
     def __init__(self, file_names):
@@ -173,23 +181,33 @@ def console_log(img, msg):
     return img
 
 
-def run_demo(export_path, filename, net, image_provider, height_size, cpu, track, smooth, ref_kpts_list=None):      
+def run_demo(
+    export_path,
+    filename,
+    net,
+    image_provider,
+    height_size,
+    cpu,
+    track,
+    smooth,
+    ref_kpts_list=None,
+):
     net = net.eval()
     # if not cpu:
     #     net = net.cuda()
     net = net.to(device)  # Change here
 
     fps_time = 0
-    
+
     stride = 8
     upsample_ratio = 4
     num_keypoints = Pose.num_kpts
     previous_poses = []
     delay = 1
-    
+
     tracking_frame_report = []
     keypoints_report = []
-    
+
     frame_id = 0
 
     for img in image_provider:
@@ -228,7 +246,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                     )
             pose = Pose(pose_keypoints, pose_entries[n][18])
             current_poses.append(pose)
-            
+
         # print(current_poses)
 
         if track:
@@ -241,7 +259,7 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
         )  # Add an alpha channel
         skeleton_img[:, :, :3] = [255, 255, 255]  # Set RGB values to white color
         skeleton_img[:, :, 3] = 0  # Set alpha channel to 0 for full transparency
-        
+
         # Combine the tracked image and the raw image on video tracking
 
         for pose in current_poses:
@@ -265,10 +283,10 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                     kpt_id = i
                     kpt_name = Pose.kpt_names[i]
                     x, y = keypoint
-                    
+
                     normalized_x = x / img.shape[1]
                     normalized_y = y / img.shape[0]
-                    
+
                     tracking_kpts_list.append(
                         {
                             "frame_id": frame_id,
@@ -276,13 +294,13 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                             "kpt_name": kpt_name,
                             "resolution": img.shape[:2],
                             "coords": [x.tolist(), y.tolist()],
-                            "normalized_coords": [normalized_x, normalized_y]
+                            "normalized_coords": [normalized_x, normalized_y],
                         }
-                    )  
-                    
-        # print("tracking_kpts_list: ", tracking_kpts_list)  
-        keypoints_report.append(tracking_kpts_list)   
-        
+                    )
+
+        # print("tracking_kpts_list: ", tracking_kpts_list)
+        keypoints_report.append(tracking_kpts_list)
+
         for pose in current_poses:
             if ref_kpts_list is None:
                 ### video detection
@@ -293,75 +311,96 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
                 ### webcam real-time detection
                 ## pass the 18 ref skeleton keypoints and webcam tracking keypoints of the current frame
                 # print("ref_kpts_list:", [kpts['kpts'] for kpts in ref_kpts_list if kpts.get('frame_id') == frame_id], "\nwebcam_kpts_list:", tracking_kpts_list, "\n\n")
-                result = pose.draw_skeleton(img, [kpts['kpts'] for kpts in ref_kpts_list if kpts.get('frame_id') == frame_id], [kpts for kpts in tracking_kpts_list if kpts.get('frame_id') == frame_id]) 
-                
+                result = pose.draw_skeleton(
+                    img,
+                    [
+                        kpts["kpts"]
+                        for kpts in ref_kpts_list
+                        if kpts.get("frame_id") == frame_id
+                    ],
+                    [
+                        kpts
+                        for kpts in tracking_kpts_list
+                        if kpts.get("frame_id") == frame_id
+                    ],
+                )
+
                 if result is not None:
                     img_with_skeleton, combined_kpts = result
                 else:
                     img_with_skeleton = img
                     combined_kpts = None
-                
+
                 if combined_kpts is not None and len(combined_kpts) > 0:
                     matching_kpts_report.append(combined_kpts[0])
-                
+
                 pose.draw(img_with_skeleton)
                 pose.draw_angles(img_with_skeleton)
                 pose.draw_colors_indicators(img_with_skeleton)
-                
+
                 img = img_with_skeleton
-                
-           
+
         # for pose in current_poses:
         #     # draw the checkpoints and lines on the img
         #     pose.draw(img)
         #     pose.draw_angles(img)
-             
+
         ## Calculate the fps
         current_time = time.time()
         fps = round(1.0 / (current_time - fps_time), 2)
-        
+
         ## Access the CPU usage
         current_cpu_load = psutil.cpu_percent()
-                
+
         ## Write the info on the img, Tommy, 02-11-2024
-        console_log(img, {"filename": filename, "frame_id": frame_id, "resolution": img.shape[:2], "frame_time": current_time, "fps": fps, "cpu_load": current_cpu_load})
-        
+        console_log(
+            img,
+            {
+                "filename": filename,
+                "frame_id": frame_id,
+                "resolution": img.shape[:2],
+                "frame_time": current_time,
+                "fps": fps,
+                "cpu_load": current_cpu_load,
+            },
+        )
+
         ## Make the frame report
-        tracking_frame_report.append({
-            "filename": filename,
-            "frame_id": frame_id,
-            "resolution": img.shape[:2],
-            "frame_time": current_time,
-            "fps": fps,
-            "cpu_load": current_cpu_load,
-            "kpts": tracking_kpts_list
-        })
-        
+        tracking_frame_report.append(
+            {
+                "filename": filename,
+                "frame_id": frame_id,
+                "resolution": img.shape[:2],
+                "frame_time": current_time,
+                "fps": fps,
+                "cpu_load": current_cpu_load,
+                "kpts": tracking_kpts_list,
+            }
+        )
+
         image_name = "frame_" + str(frame_id) + ".jpg"
-        
+
         ## Show the tracked image and skeleton image side by side
-        if ref_kpts_list is None: 
+        if ref_kpts_list is None:
             ## video detection
             img_with_alpha = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
             combined_img = np.hstack((img_with_alpha, skeleton_img))
             cv2.imshow("Original and Skeleton", combined_img)
-            
+
             ## Save the images
             # cv2.imwrite(export_path + image_name, img)
             # cv2.imwrite(export_path + "skt_" + image_name, skeleton_img)
-    #         my_image = customtkinter.CTkImage(light_image=Image.open(export_path + image_name), dark_image=Image.open(export_path + image_name),
-	# size=(img.shape[1], img.shape[0]))
-        else: 
+        #         my_image = customtkinter.CTkImage(light_image=Image.open(export_path + image_name), dark_image=Image.open(export_path + image_name),
+        # size=(img.shape[1], img.shape[0]))
+        else:
             ### webcam real-time detection
             # img_with_skeleton = cv2.addWeighted(orig_img, 0.6, img, 0.4, 0)
             cv2.imshow("Realtime webcam", img)
             ## Save the images
             # cv2.imwrite(export_path + image_name, img)
-    #         my_image = customtkinter.CTkImage(light_image=Image.open(export_path + image_name), dark_image=Image.open(export_path + image_name),
-	# size=(img.shape[1], img.shape[0]))
-        
-        
-                
+        #         my_image = customtkinter.CTkImage(light_image=Image.open(export_path + image_name), dark_image=Image.open(export_path + image_name),
+        # size=(img.shape[1], img.shape[0]))
+
         key = cv2.waitKey(delay)
         if key == 27:  # esc
             return keypoints_report, tracking_frame_report, matching_kpts_report
@@ -373,47 +412,164 @@ def run_demo(export_path, filename, net, image_provider, height_size, cpu, track
 
         frame_id += 1
         fps_time = time.time()
-    
-    
+
     return keypoints_report, tracking_frame_report, matching_kpts_report
 
-def run_pose_init(export_path, filename, net, image_provider, height_size, cpu, track, smooth, ref_kpts_list=None):
-    delay = 1
+
+def run_pose_init(
+    export_path,
+    filename,
+    net,
+    image_provider,
+    height_size,
+    cpu,
+    track,
+    smooth,
+    ref_kpts_list=None,
+):
     net = net.eval()
     # if not cpu:
     #     net = net.cuda()
     net = net.to(device)  # Change here
-    
+
+    fps_time = 0
+
+    stride = 8
+    upsample_ratio = 4
+    num_keypoints = Pose.num_kpts
+    previous_poses = []
+    delay = 1
+
+    tracking_frame_report = []
+    keypoints_report = []
+    frame_id = 0
+
     pose_init_duration = 5
     pose_init_duration += 1
     init_frame = ref_kpts_list[0]
-    
+
     init_time = time.time()
     for img in image_provider:
-        img_with_skeleton = pose_init(img, init_frame)
+        tracking_kpts_list = []
+        heatmaps, pafs, scale, pad = infer_fast(
+            net, img, height_size, stride, upsample_ratio, cpu
+        )
+
+        total_keypoints_num = 0
+        all_keypoints_by_type = []
+        for kpt_idx in range(num_keypoints):  # 19th for bg
+            total_keypoints_num += extract_keypoints(
+                heatmaps[:, :, kpt_idx], all_keypoints_by_type, total_keypoints_num
+            )
+
+        pose_entries, all_keypoints = group_keypoints(all_keypoints_by_type, pafs)
+        for kpt_id in range(all_keypoints.shape[0]):
+            all_keypoints[kpt_id, 0] = (
+                all_keypoints[kpt_id, 0] * stride / upsample_ratio - pad[1]
+            ) / scale
+            all_keypoints[kpt_id, 1] = (
+                all_keypoints[kpt_id, 1] * stride / upsample_ratio - pad[0]
+            ) / scale
+        current_poses = []
+        for n in range(len(pose_entries)):
+            if len(pose_entries[n]) == 0:
+                continue
+            pose_keypoints = np.ones((num_keypoints, 2), dtype=np.int32) * -1
+            for kpt_id in range(num_keypoints):
+                if pose_entries[n][kpt_id] != -1.0:  # keypoint was found
+                    pose_keypoints[kpt_id, 0] = int(
+                        all_keypoints[int(pose_entries[n][kpt_id]), 0]
+                    )
+                    pose_keypoints[kpt_id, 1] = int(
+                        all_keypoints[int(pose_entries[n][kpt_id]), 1]
+                    )
+            pose = Pose(pose_keypoints, pose_entries[n][18])
+            current_poses.append(pose)
+
+        # print(current_poses)
+
+        if track:
+            track_poses(previous_poses, current_poses, smooth=smooth)
+            previous_poses = current_poses
+
+        for pose in current_poses:
+            cv2.rectangle(
+                img,
+                (pose.bbox[0], pose.bbox[1]),
+                (pose.bbox[0] + pose.bbox[2], pose.bbox[1] + pose.bbox[3]),
+                (0, 255, 0),
+            )
+            if track:
+                cv2.putText(
+                    img,
+                    "id: {}".format(pose.id),
+                    (pose.bbox[0], pose.bbox[1] - 16),
+                    cv2.FONT_HERSHEY_COMPLEX,
+                    0.5,
+                    (0, 0, 255),
+                )
+
+                for i, keypoint in enumerate(pose.keypoints):
+                    kpt_id = i
+                    kpt_name = Pose.kpt_names[i]
+                    x, y = keypoint
+
+                    normalized_x = x / img.shape[1]
+                    normalized_y = y / img.shape[0]
+
+                    tracking_kpts_list.append(
+                        {
+                            "frame_id": frame_id,
+                            "kpt_id": kpt_id,
+                            "kpt_name": kpt_name,
+                            "resolution": img.shape[:2],
+                            "coords": [x.tolist(), y.tolist()],
+                            "normalized_coords": [normalized_x, normalized_y],
+                        }
+                    )
+
+        # print("tracking_kpts_list: ", tracking_kpts_list)
+        keypoints_report.append(tracking_kpts_list)
+
+        # for pose in current_poses:
+        #     print("\ntracking_kpts:", [kpts for kpts in tracking_kpts_list if kpts.get('frame_id') == frame_id])
         
+        pose.draw(img)    
+        
+        all_kpts_matched = False
+        img_with_skeleton, all_kpts_matched = pose_init(img, init_frame, [kpts for kpts in tracking_kpts_list if kpts.get('frame_id') == frame_id])
+
         # Draw countdown timer on the top left corner
         countdown = max(1, pose_init_duration - int(time.time() - init_time))
-        cv2.putText(img_with_skeleton, f"{countdown}", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 5, (255, 255, 255), 10)
-        
+        cv2.putText(
+            img_with_skeleton,
+            f"{countdown}",
+            (30, 150),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            5,
+            (255, 255, 255),
+            10,
+        )
+
         cv2.imshow("Pose Init", img_with_skeleton)
 
-    
         key = cv2.waitKey(delay)
-        if key == 27 or time.time() - init_time > pose_init_duration:  # esc or 5 seconds elapsed
+        if (
+            key == 27 or all_kpts_matched
+            # key == 27 or time.time() - init_time > pose_init_duration
+        ):  # esc or 5 seconds elapsed
             cv2.destroyAllWindows()  # Close all OpenCV windows
             break
-        
+
         elif key == 112:  # 'p'
             if delay == 1:
                 delay = 0
             else:
                 delay = 1
-        
+
+        frame_id += 1
         # cv2.waitKey(0)
     return
-    
-            
 
 
 if __name__ == "__main__":
@@ -449,32 +605,34 @@ if __name__ == "__main__":
     parser.add_argument("--track", type=int, default=1, help="track pose id in video")
     parser.add_argument("--smooth", type=int, default=1, help="smooth pose keypoints")
     args = parser.parse_args()
-    
+
     selected_video_path = None
     net = PoseEstimationWithMobileNet()
-    checkpoint = torch.load("checkpoint_iter_370000.pth", map_location=device)  # change here
+    checkpoint = torch.load(
+        "checkpoint_iter_370000.pth", map_location=device
+    )  # change here
     load_state(net, checkpoint)
     skeleton_list = []
-    
+
     def open_file_dialog():
         root = tk.Tk()
         root.withdraw()
         selected_video_path = filedialog.askopenfilename(title="Choose a video file")
         root.destroy()
         return selected_video_path
-    
+
     def btn_import_video():
         print("button pressed: Import video...")
         global selected_video_path
         selected_video_path = open_file_dialog()
         print("selected video path:", selected_video_path)
         run_video_tracking()
-        
+
     def run_video_tracking():
         print("run_video_tracking...")
 
         frame_provider = VideoReader(selected_video_path)
-        
+
         ## create the export folder
         current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         filename = os.path.basename(frame_provider.file_name)
@@ -487,31 +645,26 @@ if __name__ == "__main__":
             os.makedirs(f"{export_path}/")
 
         print("imported file:", filename)
-        
+
         start_time = time.time()
         print("Start video processing...")
-        
-        result = run_demo(
-                export_path,
-                filename,
-                net,
-                frame_provider,
-                256,
-                "",
-                1,
-                1
-            )
-        
+
+        result = run_demo(export_path, filename, net, frame_provider, 256, "", 1, 1)
+
         total_time = time.time() - start_time
         print(f"Total processing time: {total_time:.2f} seconds")
-        
+
         ## Handle the reports
         print("result length:", len(result))
         keypoints_report, tracking_frame_report, matching_kpts_report = result
-        
-        avg_fps = sum([frame['fps'] for frame in tracking_frame_report]) / len(tracking_frame_report)
-        avg_cpu_load = sum([frame['cpu_load'] for frame in tracking_frame_report]) / len(tracking_frame_report)
-        
+
+        avg_fps = sum([frame["fps"] for frame in tracking_frame_report]) / len(
+            tracking_frame_report
+        )
+        avg_cpu_load = sum(
+            [frame["cpu_load"] for frame in tracking_frame_report]
+        ) / len(tracking_frame_report)
+
         summary_report = {
             "datetime": current_datetime,
             "filename": filename,
@@ -519,28 +672,33 @@ if __name__ == "__main__":
             "avg_fps": avg_fps,
             "avg_cpu_load": avg_cpu_load,
         }
-        
+
         with open(f"{export_path}tracking_frame_report.json", "w") as file:
             json.dump(tracking_frame_report, file, indent=4)
-        
+
         with open(f"{export_path}summary_report.json", "w") as file:
             json.dump(summary_report, file, indent=4)
-        
+
         global skeleton_list
         skeleton_list = tracking_frame_report
-        
+
         cv2.waitKey(0)
         cv2.destroyAllWindows()
-        
+
         ## Go back to the customTkinter window, add a button with text "Are you ready?"
-        button_ready_for_realtime = customtkinter.CTkButton(app, text="Are you ready?", width=300, height=50, command=run_realtime_tracking)
+        button_ready_for_realtime = customtkinter.CTkButton(
+            app,
+            text="Are you ready?",
+            width=300,
+            height=50,
+            command=run_realtime_tracking,
+        )
         button_ready_for_realtime.grid(row=2, column=0, padx=0, pady=(20, 10))
-            
-    
+
     def run_realtime_tracking():
         print("run_realtime_tracking...")
         ## create the export folder
-        frame_provider = VideoReader("1")
+        frame_provider = VideoReader("0")
         current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         filename = "webcam"
         export_path = f"detection/exports/{filename}_{current_datetime}/"
@@ -549,48 +707,39 @@ if __name__ == "__main__":
         else:
             shutil.rmtree(f"{export_path}/")
             os.makedirs(f"{export_path}/")
-            
+
         start_time = time.time()
         print("Start processing...")
         result = None
-        
+
         ## Pose Init Step
         run_pose_init(
-            export_path,
-            filename,
-            net,
-            frame_provider,
-            256,
-            "",
-            1,
-            1,
-            skeleton_list)
-        
+            export_path, filename, net, frame_provider, 256, "", 1, 1, skeleton_list
+        )
+
         result = run_demo(
-                export_path,
-                filename,
-                net,
-                frame_provider,
-                256,
-                "",
-                1,
-                1,
-                skeleton_list
-            )
-        
+            export_path, filename, net, frame_provider, 256, "", 1, 1, skeleton_list
+        )
+
         total_time = time.time() - start_time
         print(f"Total processing time: {total_time:.2f} seconds")
-        
+
         ## Handle the reports
         print("result length:", len(result))
         keypoints_report, tracking_frame_report, matching_kpts_report = result
-        
-        avg_fps = sum([frame['fps'] for frame in tracking_frame_report]) / len(tracking_frame_report)
-        avg_cpu_load = sum([frame['cpu_load'] for frame in tracking_frame_report]) / len(tracking_frame_report)
-        
-        if filename == 'webcam':
-            max_distance, min_distance, mean_distance, median_distance, std_distance = calculate_distance_statistics(matching_kpts_report)
-        
+
+        avg_fps = sum([frame["fps"] for frame in tracking_frame_report]) / len(
+            tracking_frame_report
+        )
+        avg_cpu_load = sum(
+            [frame["cpu_load"] for frame in tracking_frame_report]
+        ) / len(tracking_frame_report)
+
+        if filename == "webcam":
+            max_distance, min_distance, mean_distance, median_distance, std_distance = (
+                calculate_distance_statistics(matching_kpts_report)
+            )
+
         summary_report = {
             "datetime": current_datetime,
             "filename": filename,
@@ -601,41 +750,46 @@ if __name__ == "__main__":
             "min_distance": min_distance,
             "mean_distance": mean_distance,
             "median_distance": median_distance,
-            "std_distance": std_distance
+            "std_distance": std_distance,
         }
-            
+
         with open(f"{export_path}tracking_frame_report.json", "w") as file:
             json.dump(tracking_frame_report, file, indent=4)
-        
+
         with open(f"{export_path}summary_report.json", "w") as file:
             json.dump(summary_report, file, indent=4)
-        
+
         with open(f"{export_path}matching_kpts_report.json", "w") as file:
             json.dump(matching_kpts_report, file, indent=4)
-            
+
         cv2.waitKey(0)
         cv2.destroyAllWindows()
-        
-        
-        
+
     if args.demo == 1:
         print("Demo mode is on")
-        
+
         ## Init the customTkinter window
         customtkinter.set_appearance_mode("light")
         app = customtkinter.CTk()
         app.geometry("1080x607")
         app.title("Lightweight OpenPose Demo")
-        
-        label = customtkinter.CTkLabel(app, text="Choose your exercise video for tracking", fg_color="transparent", font=("Arial", 20))
-        button = customtkinter.CTkButton(app, text="Import", width=200, command=btn_import_video)
-        
+
+        label = customtkinter.CTkLabel(
+            app,
+            text="Choose your exercise video for tracking",
+            fg_color="transparent",
+            font=("Arial", 20),
+        )
+        button = customtkinter.CTkButton(
+            app, text="Import", width=200, command=btn_import_video
+        )
+
         app.grid_columnconfigure(0, weight=1)
         label.grid(row=0, column=0, padx=0, pady=(20, 10))
         button.grid(row=1, column=0, padx=0, pady=0)
-        
+
         app.mainloop()
-        
+
     else:
         print("Demo mode is off")
 
@@ -644,7 +798,9 @@ if __name__ == "__main__":
 
         net = PoseEstimationWithMobileNet()
         # checkpoint = torch.load(args.checkpoint_path, map_location='cpu')
-        checkpoint = torch.load(args.checkpoint_path, map_location=device)  # change here
+        checkpoint = torch.load(
+            args.checkpoint_path, map_location=device
+        )  # change here
         load_state(net, checkpoint)
 
         frame_provider = ImageReader(args.images)
@@ -668,17 +824,23 @@ if __name__ == "__main__":
             os.makedirs(f"{export_path}/")
 
         print("imported file:", filename)
-        
+
         ## Load the JSON data from the file
-        with open('reports/tracking_frame_report_video-2.json', 'r') as file:
+        with open("reports/tracking_frame_report_video-2.json", "r") as file:
             skeleton_list = json.load(file)
-        
+
         start_time = time.time()
         print("Start processing...")
         result = None
-        if args.video == '0' or args.video == '1' or args.video == '2' or args.video == '3' or args.video == '4':
+        if (
+            args.video == "0"
+            or args.video == "1"
+            or args.video == "2"
+            or args.video == "3"
+            or args.video == "4"
+        ):
             ### Real-time webcam detection
-            
+
             # real-time webcam
             result = run_demo(
                 export_path,
@@ -689,7 +851,7 @@ if __name__ == "__main__":
                 args.cpu,
                 args.track,
                 args.smooth,
-                skeleton_list
+                skeleton_list,
             )
         else:
             ### Video detection
@@ -701,51 +863,57 @@ if __name__ == "__main__":
                 args.height_size,
                 args.cpu,
                 args.track,
-                args.smooth
+                args.smooth,
             )
-            
+
         total_time = time.time() - start_time
         print(f"Total processing time: {total_time:.2f} seconds")
-        
+
         ## Handle the reports
         print("result length:", len(result))
         keypoints_report, tracking_frame_report, matching_kpts_report = result
-        
+
         avg_fps = -1
         avg_cpu_load = -1
-        if (len(tracking_frame_report) != 0 and len(matching_kpts_report) != 0):
-            avg_fps = sum([frame['fps'] for frame in tracking_frame_report]) / len(tracking_frame_report)
-            avg_cpu_load = sum([frame['cpu_load'] for frame in tracking_frame_report]) / len(tracking_frame_report)
-        
-        if filename == 'webcam':
-            max_distance, min_distance, mean_distance, median_distance, std_distance = calculate_distance_statistics(matching_kpts_report)
-        
+        if len(tracking_frame_report) != 0 and len(matching_kpts_report) != 0:
+            avg_fps = sum([frame["fps"] for frame in tracking_frame_report]) / len(
+                tracking_frame_report
+            )
+            avg_cpu_load = sum(
+                [frame["cpu_load"] for frame in tracking_frame_report]
+            ) / len(tracking_frame_report)
+
+        if filename == "webcam":
+            max_distance, min_distance, mean_distance, median_distance, std_distance = (
+                calculate_distance_statistics(matching_kpts_report)
+            )
+
         summary_report = {
             "datetime": current_datetime,
             "filename": filename,
             "total_time": total_time,
             "avg_fps": avg_fps,
             "avg_cpu_load": avg_cpu_load,
-            "max_distance": max_distance if filename == 'webcam' else None,
-            "min_distance": min_distance if filename == 'webcam' else None,
-            "mean_distance": mean_distance if filename == 'webcam' else None,
-            "median_distance": median_distance if filename == 'webcam' else None,
-            "std_distance": std_distance if filename == 'webcam' else None
+            "max_distance": max_distance if filename == "webcam" else None,
+            "min_distance": min_distance if filename == "webcam" else None,
+            "mean_distance": mean_distance if filename == "webcam" else None,
+            "median_distance": median_distance if filename == "webcam" else None,
+            "std_distance": std_distance if filename == "webcam" else None,
         }
-        
+
         ## export JSON files
         # with open(f"{export_path}kpts_report.json", "w") as file:
         #     json.dump(keypoints_report, file, indent=4)
-            
+
         with open(f"{export_path}tracking_frame_report.json", "w") as file:
             json.dump(tracking_frame_report, file, indent=4)
-        
+
         with open(f"{export_path}summary_report.json", "w") as file:
             json.dump(summary_report, file, indent=4)
-        
+
         with open(f"{export_path}matching_kpts_report.json", "w") as file:
             json.dump(matching_kpts_report, file, indent=4)
-            
+
         # combined_frame_report = combine_frame_report(frame_report, webcam_frame_report)
         # with open(f"{export_path}combined_frame_report.json", 'w') as file:
         #     json.dump(combined_frame_report, file, indent=4)
