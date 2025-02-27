@@ -428,12 +428,9 @@ def run_pose_init(
     ref_kpts_list=None,
 ):
     net = net.eval()
-    # if not cpu:
-    #     net = net.cuda()
-    net = net.to(device)  # Change here
+    net = net.to(device)
 
     fps_time = 0
-
     stride = 8
     upsample_ratio = 4
     num_keypoints = Pose.num_kpts
@@ -444,133 +441,185 @@ def run_pose_init(
     keypoints_report = []
     frame_id = 0
 
-    pose_init_duration = 5
-    pose_init_duration += 1
+    pose_init_duration = 20  # 20 seconds as requested
     init_frame = ref_kpts_list[0]
-
+    
+    continue_init = True
     init_time = time.time()
-    for img in image_provider:
-        tracking_kpts_list = []
-        heatmaps, pafs, scale, pad = infer_fast(
-            net, img, height_size, stride, upsample_ratio, cpu
-        )
 
-        total_keypoints_num = 0
-        all_keypoints_by_type = []
-        for kpt_idx in range(num_keypoints):  # 19th for bg
-            total_keypoints_num += extract_keypoints(
-                heatmaps[:, :, kpt_idx], all_keypoints_by_type, total_keypoints_num
+    while continue_init:
+        for img in image_provider:
+            tracking_kpts_list = []
+            heatmaps, pafs, scale, pad = infer_fast(
+                net, img, height_size, stride, upsample_ratio, cpu
             )
 
-        pose_entries, all_keypoints = group_keypoints(all_keypoints_by_type, pafs)
-        for kpt_id in range(all_keypoints.shape[0]):
-            all_keypoints[kpt_id, 0] = (
-                all_keypoints[kpt_id, 0] * stride / upsample_ratio - pad[1]
-            ) / scale
-            all_keypoints[kpt_id, 1] = (
-                all_keypoints[kpt_id, 1] * stride / upsample_ratio - pad[0]
-            ) / scale
-        current_poses = []
-        for n in range(len(pose_entries)):
-            if len(pose_entries[n]) == 0:
-                continue
-            pose_keypoints = np.ones((num_keypoints, 2), dtype=np.int32) * -1
-            for kpt_id in range(num_keypoints):
-                if pose_entries[n][kpt_id] != -1.0:  # keypoint was found
-                    pose_keypoints[kpt_id, 0] = int(
-                        all_keypoints[int(pose_entries[n][kpt_id]), 0]
-                    )
-                    pose_keypoints[kpt_id, 1] = int(
-                        all_keypoints[int(pose_entries[n][kpt_id]), 1]
-                    )
-            pose = Pose(pose_keypoints, pose_entries[n][18])
-            current_poses.append(pose)
-
-        # print(current_poses)
-
-        if track:
-            track_poses(previous_poses, current_poses, smooth=smooth)
-            previous_poses = current_poses
-
-        for pose in current_poses:
-            cv2.rectangle(
-                img,
-                (pose.bbox[0], pose.bbox[1]),
-                (pose.bbox[0] + pose.bbox[2], pose.bbox[1] + pose.bbox[3]),
-                (0, 255, 0),
-            )
-            if track:
-                cv2.putText(
-                    img,
-                    "id: {}".format(pose.id),
-                    (pose.bbox[0], pose.bbox[1] - 16),
-                    cv2.FONT_HERSHEY_COMPLEX,
-                    0.5,
-                    (0, 0, 255),
+            total_keypoints_num = 0
+            all_keypoints_by_type = []
+            for kpt_idx in range(num_keypoints):
+                total_keypoints_num += extract_keypoints(
+                    heatmaps[:, :, kpt_idx], all_keypoints_by_type, total_keypoints_num
                 )
 
-                for i, keypoint in enumerate(pose.keypoints):
-                    kpt_id = i
-                    kpt_name = Pose.kpt_names[i]
-                    x, y = keypoint
+            pose_entries, all_keypoints = group_keypoints(all_keypoints_by_type, pafs)
+            for kpt_id in range(all_keypoints.shape[0]):
+                all_keypoints[kpt_id, 0] = (
+                    all_keypoints[kpt_id, 0] * stride / upsample_ratio - pad[1]
+                ) / scale
+                all_keypoints[kpt_id, 1] = (
+                    all_keypoints[kpt_id, 1] * stride / upsample_ratio - pad[0]
+                ) / scale
+            current_poses = []
+            for n in range(len(pose_entries)):
+                if len(pose_entries[n]) == 0:
+                    continue
+                pose_keypoints = np.ones((num_keypoints, 2), dtype=np.int32) * -1
+                for kpt_id in range(num_keypoints):
+                    if pose_entries[n][kpt_id] != -1.0:
+                        pose_keypoints[kpt_id, 0] = int(
+                            all_keypoints[int(pose_entries[n][kpt_id]), 0]
+                        )
+                        pose_keypoints[kpt_id, 1] = int(
+                            all_keypoints[int(pose_entries[n][kpt_id]), 1]
+                        )
+                pose = Pose(pose_keypoints, pose_entries[n][18])
+                current_poses.append(pose)
 
-                    normalized_x = x / img.shape[1]
-                    normalized_y = y / img.shape[0]
+            if track:
+                track_poses(previous_poses, current_poses, smooth=smooth)
+                previous_poses = current_poses
 
-                    tracking_kpts_list.append(
-                        {
-                            "frame_id": frame_id,
-                            "kpt_id": kpt_id,
-                            "kpt_name": kpt_name,
-                            "resolution": img.shape[:2],
-                            "coords": [x.tolist(), y.tolist()],
-                            "normalized_coords": [normalized_x, normalized_y],
-                        }
+            # Process detected poses
+            all_kpts_matched = False
+            img_with_skeleton = img.copy()
+            if current_poses:
+                for pose in current_poses:
+                    cv2.rectangle(
+                        img,
+                        (pose.bbox[0], pose.bbox[1]),
+                        (pose.bbox[0] + pose.bbox[2], pose.bbox[1] + pose.bbox[3]),
+                        (0, 255, 0),
                     )
+                    if track:
+                        cv2.putText(
+                            img,
+                            "id: {}".format(pose.id),
+                            (pose.bbox[0], pose.bbox[1] - 16),
+                            cv2.FONT_HERSHEY_COMPLEX,
+                            0.5,
+                            (0, 0, 255),
+                        )
 
-        # print("tracking_kpts_list: ", tracking_kpts_list)
-        keypoints_report.append(tracking_kpts_list)
+                        for i, keypoint in enumerate(pose.keypoints):
+                            kpt_id = i
+                            kpt_name = Pose.kpt_names[i]
+                            x, y = keypoint
+                            normalized_x = x / img.shape[1]
+                            normalized_y = y / img.shape[0]
+                            tracking_kpts_list.append(
+                                {
+                                    "frame_id": frame_id,
+                                    "kpt_id": kpt_id,
+                                    "kpt_name": kpt_name,
+                                    "resolution": img.shape[:2],
+                                    "coords": [x.tolist(), y.tolist()],
+                                    "normalized_coords": [normalized_x, normalized_y],
+                                }
+                            )
 
-        # for pose in current_poses:
-        #     print("\ntracking_kpts:", [kpts for kpts in tracking_kpts_list if kpts.get('frame_id') == frame_id])
-        
-        pose.draw(img)    
-        
-        all_kpts_matched = False
-        img_with_skeleton, all_kpts_matched = pose_init(img, init_frame, [kpts for kpts in tracking_kpts_list if kpts.get('frame_id') == frame_id])
-
-        # Draw countdown timer on the top left corner
-        countdown = max(1, pose_init_duration - int(time.time() - init_time))
-        cv2.putText(
-            img_with_skeleton,
-            f"{countdown}",
-            (30, 150),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            5,
-            (255, 255, 255),
-            10,
-        )
-
-        cv2.imshow("Pose Init", img_with_skeleton)
-
-        key = cv2.waitKey(delay)
-        if (
-            key == 27 or all_kpts_matched
-            # key == 27 or time.time() - init_time > pose_init_duration
-        ):  # esc or 5 seconds elapsed
-            cv2.destroyAllWindows()  # Close all OpenCV windows
-            break
-
-        elif key == 112:  # 'p'
-            if delay == 1:
-                delay = 0
+                keypoints_report.append(tracking_kpts_list)
+                pose = current_poses[0]  # Single-person assumption
+                pose.draw(img)
+                img_with_skeleton, all_kpts_matched = pose_init(
+                    img,
+                    init_frame,
+                    [kpts for kpts in tracking_kpts_list if kpts.get("frame_id") == frame_id]
+                )
             else:
-                delay = 1
+                img_with_skeleton, _ = pose_init(img, init_frame, None)
 
-        frame_id += 1
-        # cv2.waitKey(0)
+            # Draw countdown timer
+            elapsed_time = time.time() - init_time
+            countdown = max(0, pose_init_duration - int(elapsed_time))
+            cv2.putText(
+                img_with_skeleton,
+                f"{countdown}",
+                (30, 150),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                2,
+                (255, 255, 255),
+                5,
+            )
+
+            cv2.imshow("Pose Init", img_with_skeleton)
+
+            key = cv2.waitKey(delay)
+            if key == 27 or all_kpts_matched:  # Esc or all keypoints matched
+                cv2.destroyAllWindows()
+                return
+            elif key == 112:  # 'p' to pause/unpause
+                delay = 0 if delay == 1 else 1
+
+            frame_id += 1
+
+            # Check if duration seconds have elapsed
+            if elapsed_time >= pose_init_duration and not all_kpts_matched:
+                # Modal dialog
+                def create_modal():
+                    modal = customtkinter.CTkToplevel()
+                    modal.geometry("400x200")
+                    modal.title("Pose Initialization Timeout")
+                    modal.attributes('-topmost', True)
+
+                    label = customtkinter.CTkLabel(
+                        modal,
+                        text="Do you want to try again or start the exercise?",
+                        font=("Arial", 14),
+                    )
+                    label.pack(pady=20)
+
+                    def continue_pose_init():
+                        nonlocal continue_init, init_time
+                        continue_init = True
+                        init_time = time.time()  # Reset timer
+                        modal.destroy()
+
+                    def start_tracking():
+                        nonlocal continue_init
+                        continue_init = False
+                        modal.destroy()
+
+                    btn_continue = customtkinter.CTkButton(
+                        modal,
+                        text="Retry",
+                        width=150,
+                        command=continue_pose_init,
+                    )
+                    btn_continue.pack(side="left", padx=20, pady=10)
+
+                    btn_start = customtkinter.CTkButton(
+                        modal,
+                        text="Start Exercise",
+                        width=150,
+                        command=start_tracking,
+                    )
+                    btn_start.pack(side="right", padx=20, pady=10)
+
+                    modal.grab_set()
+                    modal.wait_window()  # Wait for modal to close without mainloop
+
+                cv2.destroyAllWindows()  # Close OpenCV window before modal
+                create_modal()
+                if continue_init:
+                    # Reopen the OpenCV window for continuation
+                    cv2.imshow("Pose Init", img_with_skeleton)
+                else:
+                    break  # Exit the inner loop to let run_realtime_tracking proceed
+
+        if not continue_init:
+            break  # Exit the outer loop if Start Tracking was chosen
+
     return
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -920,3 +969,4 @@ if __name__ == "__main__":
 
         # Add this line to prevent the OpenCV windows from closing automatically
         cv2.waitKey(0)
+
