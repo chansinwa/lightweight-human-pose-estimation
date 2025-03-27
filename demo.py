@@ -612,16 +612,16 @@ if __name__ == "__main__":
         
         # Threshold check for individual RMS
         threshold = 80  
-        high_rms_count = sum(1 for rms in individual_rms if rms < threshold)
+        low_rms_count = sum(1 for rms in individual_rms if rms < threshold)
         total_keypoints = len(individual_rms)
-        percentage_high_rms = (high_rms_count / total_keypoints) * 100 if total_keypoints > 0 else 0
+        percentage_low_rms = (low_rms_count / total_keypoints) * 100 if total_keypoints > 0 else 0
 
         # Determine matching quality based on percentage
-        if percentage_high_rms > 80:
+        if percentage_low_rms > 80:
             matching_quality = "Perfect matching"
-        elif 50 <= percentage_high_rms <= 80:
+        elif 50 <= percentage_low_rms <= 80:
             matching_quality = "Good matching"
-        elif 30 <= percentage_high_rms < 50:
+        elif 30 <= percentage_low_rms < 50:
             matching_quality = "Not matching enough"
         else:
             matching_quality = "Poor matching"
