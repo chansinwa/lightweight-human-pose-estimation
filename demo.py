@@ -747,7 +747,7 @@ if __name__ == "__main__":
     def run_realtime_tracking():
         print("run_realtime_tracking...")
         ## create the export folder
-        frame_provider = VideoReader("0")
+        frame_provider = VideoReader("1")
         current_datetime = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         filename = "webcam"
         export_path = f"detection/exports/{filename}_{current_datetime}/"
